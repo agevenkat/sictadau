@@ -1,0 +1,104 @@
+<% activePage = 'projects'; %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0"><%= typeof isEdit !== 'undefined' && isEdit ? 'Edit Working Report' : 'New Working Report' %></h4>
+  <a href="/projects" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<% if (errors && errors.length) { %>
+<div class="alert alert-danger"><ul class="mb-0 ps-3"><% errors.forEach(e => { %><li><%= e %></li><% }) %></ul></div>
+<% } %>
+
+<form action="/projects<%= typeof isEdit !== 'undefined' && isEdit ? '/' + project.id : '' %>" method="POST" enctype="multipart/form-data">
+  <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+  <% if (typeof isEdit !== 'undefined' && isEdit) { %><input type="hidden" name="_method" value="PUT"><% } %>
+
+  <div class="form-card">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Film Name <span class="text-danger">*</span></label>
+        <input type="text" name="film_name" class="form-control" value="<%= project.film_name || '' %>" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Production Company <span class="text-danger">*</span></label>
+        <input type="text" name="production_company" class="form-control" value="<%= project.production_company || '' %>" required>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Production Company Address</label>
+        <input type="text" name="production_company_address" class="form-control" value="<%= project.production_company_address || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Language</label>
+        <select name="language" class="form-select select2-search" id="language_select">
+          <option value="">— Select —</option>
+          <% LANGUAGES.forEach(l => { %><option value="<%= l %>" <%= project.language === l ? 'selected' : '' %>><%= l %></option><% }) %>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Production Contact No</label>
+        <input type="text" name="production_contact_no" class="form-control" value="<%= project.production_contact_no || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Representative Name</label>
+        <select name="representative_id" class="form-select select2-search" id="rep_select">
+          <option value="">— Select —</option>
+          <% reps.forEach(r => { %><option value="<%= r.id %>" <%= project.representative_id == r.id ? 'selected' : '' %>><%= r.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Place of Dubbing</label>
+        <input type="text" name="place_of_dubbing" class="form-control" value="<%= project.place_of_dubbing || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Start Date</label>
+        <input type="date" name="start_date" class="form-control" value="<%= project.start_date ? project.start_date.split(' ')[0] : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">End Date</label>
+        <input type="date" name="end_date" class="form-control" value="<%= project.end_date ? project.end_date.split(' ')[0] : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Company Email</label>
+        <input type="email" name="company_email" class="form-control" value="<%= project.company_email || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Amount</label>
+        <div class="input-group">
+          <span class="input-group-text">₹</span>
+          <input type="number" name="amount" class="form-control" value="<%= project.amount || 0 %>" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Invoice No</label>
+        <input type="text" name="invoice_no" class="form-control" value="<%= project.invoice_no || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-select select2-search" id="status_select">
+          <% STATUSES.forEach(s => { %><option value="<%= s %>" <%= project.status === s ? 'selected' : '' %>><%= s %></option><% }) %>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Representative Form <small class="text-muted">(PDF/Image)</small></label>
+        <% if (project.representative_form) { %><div class="mb-1"><a href="<%= project.representative_form %>" target="_blank" class="small text-primary">Current file</a></div><% } %>
+        <input type="file" name="representative_form" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Working Report <small class="text-muted">(PDF/Image)</small></label>
+        <% if (project.working_report_file) { %><div class="mb-1"><a href="<%= project.working_report_file %>" target="_blank" class="small text-primary">Current file</a></div><% } %>
+        <input type="file" name="working_report_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-check-lg me-1"></i><%= typeof isEdit !== 'undefined' && isEdit ? 'Update' : 'Create' %>
+    </button>
+    <% if (typeof isEdit === 'undefined' || !isEdit) { %>
+    <button type="submit" name="_action" value="create_close" class="btn btn-secondary">Create and close</button>
+    <% } %>
+    <a href="/projects" class="btn btn-link text-muted">or Cancel</a>
+  </div>
+</form>
+

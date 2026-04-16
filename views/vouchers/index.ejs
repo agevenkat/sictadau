@@ -1,0 +1,111 @@
+<% activePage = 'vouchers'; %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">Artist Vouchers</h4>
+    <small class="text-muted"><%= stats.total %> total &bull; <%= stats.pending %> pending &bull; ₹<%= Math.round(stats.paid_amount||0).toLocaleString('en-IN') %> disbursed</small>
+  </div>
+  <a href="/vouchers/create" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Voucher</a>
+</div>
+
+<div class="card mb-3 border-0 shadow-sm">
+  <div class="card-body py-2">
+    <form class="row g-2 align-items-end" method="GET">
+      <div class="col-md-4">
+        <input type="text" name="search" class="form-control form-control-sm" placeholder="Search artist, project..." value="<%= search %>">
+      </div>
+      <div class="col-md-2">
+        <select name="status" class="form-select form-select-sm">
+          <option value="">All Status</option>
+          <option value="Pending" <%= status === 'Pending' ? 'selected' : '' %>>Pending</option>
+          <option value="Paid" <%= status === 'Paid' ? 'selected' : '' %>>Paid</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select name="project_id" class="form-select form-select-sm">
+          <option value="">All Projects</option>
+          <% projects.forEach(p => { %><option value="<%= p.id %>" <%= project_id == p.id ? 'selected' : '' %>><%= p.film_name %></option><% }) %>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-primary">Filter</button>
+        <a href="/vouchers" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+      </div>
+    </form>
+    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle"></i> Click column headers to sort • Default: Latest first</small>
+  </div>
+</div>
+
+<div class="table-card card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table id="vouchersTable" class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Artist Name</th>
+            <th>Project Name</th>
+            <th>Account no</th>
+            <th>IFSC</th>
+            <th>Bank</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>SMS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% vouchers.forEach(v => { %>
+          <tr>
+            <td class="small text-muted"><%= new Date(v.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) %></td>
+            <td>
+              <a href="/members/<%= v.member_id %>" class="fw-medium text-decoration-none text-primary">
+                (<%= v.membership_no %>) <%= v.full_name %>
+              </a>
+            </td>
+            <td>
+              <a href="/projects/<%= v.project_id %>" class="text-decoration-none text-muted small">
+                <%= v.film_name %>
+              </a>
+            </td>
+            <td class="small text-muted"><%= v.bank_account_no || '—' %></td>
+            <td class="small text-muted"><%= v.ifsc_code || '—' %></td>
+            <td class="small text-muted"><%= v.bank_name || '—' %></td>
+            <td class="small fw-medium">Rs. <%= (v.final_amount||0).toLocaleString('en-IN') %></td>
+            <td>
+              <% if (v.status === 'Pending') { %>
+                <form action="/vouchers/<%= v.id %>/pay" method="POST" class="d-inline">
+                  <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                  <input type="hidden" name="payment_method" value="NEFT">
+                  <button class="btn btn-success btn-sm">Pay Now</button>
+                </form>
+              <% } else { %>
+                <span class="badge badge-paid">Paid</span>
+              <% } %>
+            </td>
+            <td>
+              <a href="/vouchers/<%= v.id %>/show" class="btn btn-sm btn-outline-secondary" target="_blank" title="View Slip">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+$(function(){
+  initDataTable('#vouchersTable', {
+    order: [[0, 'desc']], // Latest vouchers first
+    pageLength: 100,
+    pagingType: 'simple', // Prev/Next buttons only
+    columnDefs: [
+      { orderable: false, targets: [7, 8] },
+      { responsivePriority: 1, targets: [1, 7] },
+      { responsivePriority: 2, targets: [6] }
+    ]
+  });
+});
+</script>

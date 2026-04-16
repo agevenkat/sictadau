@@ -1,0 +1,185 @@
+<% activePage = 'projects'; %>
+
+<!-- Print and Download Buttons -->
+<div class="d-print-none mb-3" style="display: flex; gap: 10px;">
+  <button onclick="window.print()" class="btn btn-sm" style="background: #303493; color: white; border: none;"><i class="bi bi-printer me-1"></i>Print</button>
+  <a href="/projects/<%= project.id %>/download-invoice" class="btn btn-sm" style="background: #EE3134; color: white; border: none;"><i class="bi bi-download me-1"></i>Download PDF</a>
+</div>
+
+<!-- Modern Professional Report -->
+<div style="background: #fff; padding: 40px; min-height: 900px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;">
+
+  <!-- Header -->
+  <div style="margin-bottom: 30px; display: flex; justify-content: space-between; border-bottom: 3px solid #303493; padding-bottom: 20px;">
+    <div>
+      <div style="font-size: 13px; margin-bottom: 8px; color: #000000;">Project Entry Date : <strong style="color: #000000;"><%= project.start_date %></strong></div>
+      <div style="font-size: 13px; color: #000000;">Project End Date : <strong style="color: #000000;"><%= project.end_date %></strong></div>
+    </div>
+    <div style="text-align: right;">
+      <div style="font-size: 13px; margin-bottom: 8px;">Invoice No. : <strong style="color: #303493; font-size: 18px;"><%= project.id %></strong></div>
+      <div style="font-size: 13px;">Status : <strong style="color: white; background: <%= project.status === 'Paid' ? '#303493' : '#EE3134' %>; padding: 4px 12px; border-radius: 4px;"><%= project.status %></strong></div>
+    </div>
+  </div>
+
+  <!-- From and To -->
+  <div style="display: flex; justify-content: space-between; margin-bottom: 35px; gap: 40px;">
+    <!-- From -->
+    <div style="flex: 1; display: flex; gap: 20px;">
+      <div style="flex-shrink: 0;">
+        <img src="/images/logo.png" style="width: 90px; height: 90px; object-fit: contain; border-radius: 8px;">
+      </div>
+      <div>
+        <div style="font-size: 11px; font-weight: 700; margin-bottom: 12px; color: #303493; letter-spacing: 0.5px; text-transform: uppercase;">From:</div>
+        <div style="font-size: 13px; line-height: 1.7; color: #000000;">
+          <strong style="font-size: 14px; color: #000000; display: block; margin-bottom: 6px;">South Indian Cine, Television Artistes and Dubbing Artistes Union</strong>
+          <span style="color: #000000; font-size: 12px;">ESTD : 1983 - Regd No. 1337/MDS</span><br>
+          <span style="color: #000000; font-size: 12px;">Affiliated with FEFSI</span><br>
+          <span style="color: #000000; font-size: 12px;">10, Vijayaraghavapuram 4th Street, Saligamam, Chennai-600093</span><br>
+          <span style="color: #000000; font-size: 12px;">044-23650223, 23650225, 23650229</span><br>
+          <span style="color: #303493; font-size: 12px; font-weight: 500;">sictadau@gmail.com</span>
+        </div>
+      </div>
+    </div>
+    <!-- To -->
+    <div style="flex: 1;">
+      <div style="font-size: 11px; font-weight: 700; margin-bottom: 12px; color: #303493; letter-spacing: 0.5px; text-transform: uppercase;">To:</div>
+      <div style="font-size: 13px; line-height: 1.7; color: #000000;">
+        <strong style="font-size: 14px; color: #000000; display: block; margin-bottom: 6px;"><%= project.production_company %></strong>
+        <span style="color: #000000; font-size: 12px;">Project Name : <strong><%= project.film_name %></strong></span><br>
+        <span style="color: #000000; font-size: 12px;">Project Language : <strong><%= project.language || '—' %></strong></span><br>
+        <span style="color: #000000; font-size: 12px;">POD : <strong><%= project.place_of_dubbing || '—' %></strong></span><br>
+        <span style="color: #000000; font-size: 12px;">Contact : <%= project.production_contact_no || '—' %></span><br>
+        <span style="color: #000000; font-size: 12px;">Representative: <strong><%= project.rep_name || '—' %></strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Box -->
+  <div style="background: linear-gradient(135deg, #303493 0%, #1a1d5e 100%); padding: 28px; margin-bottom: 35px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    <div style="display: flex; justify-content: space-around; text-align: center;">
+      <div>
+        <div style="font-size: 10px; color: #ffffff; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">TOTAL AMOUNT</div>
+        <div style="font-size: 20px; font-weight: 700; color: #fff;">₹<%= (project.amount||0).toLocaleString('en-IN') %></div>
+      </div>
+      <div style="border-left: 2px solid rgba(255,255,255,0.2); border-right: 2px solid rgba(255,255,255,0.2); padding: 0 30px;">
+        <div style="font-size: 10px; color: #ffffff; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">AMOUNT RECEIVED</div>
+        <div style="font-size: 20px; font-weight: 700; color: #fff;">₹<%= (project.payment_received||0).toLocaleString('en-IN') %></div>
+      </div>
+      <div>
+        <div style="font-size: 10px; color: #ffffff; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">BALANCE</div>
+        <div style="font-size: 20px; font-weight: 700; color: <%= ((project.amount||0) - (project.payment_received||0)) > 0 ? '#EE3134' : '#fff' %>;">₹<%= ((project.amount||0) - (project.payment_received||0)).toLocaleString('en-IN') %></div>
+      </div>
+      <div style="border-left: 2px solid rgba(255,255,255,0.2);">
+        <div style="font-size: 10px; color: #ffffff; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">TOTAL ARTISTS</div>
+        <div style="font-size: 20px; font-weight: 700; color: #fff;"><%= vouchers.length %></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Artist Vouchers Table -->
+  <div style="margin-bottom: 35px;">
+    <div style="font-size: 13px; font-weight: 700; margin-bottom: 15px; color: #303493; padding-bottom: 10px; border-bottom: 2px solid #303493;">Artist Vouchers (<%= vouchers.length %>)</div>
+
+    <% if (vouchers.length === 0) { %>
+    <div style="padding: 30px; text-align: center; color: #999; font-size: 13px;">
+      No vouchers added yet
+    </div>
+    <% } else { %>
+    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+      <thead>
+        <tr style="background: #303493; color: white;">
+          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">ID</th>
+          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">Mem No.</th>
+          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">Dubbing Artist Name</th>
+          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">Character</th>
+          <th style="padding: 12px; text-align: right; font-weight: 700; border: none;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% vouchers.forEach((v, idx) => { %>
+        <tr style="border-bottom: 1px solid #e0e0e0; background: <%= idx % 2 === 0 ? '#f9f9f9' : '#fff' %>;">
+          <td style="padding: 12px; color: #000000;"><%= v.id %></td>
+          <td style="padding: 12px; color: #000000;"><%= v.membership_no %></td>
+          <td style="padding: 12px; color: #000000; font-weight: 500;"><%= v.full_name %></td>
+          <td style="padding: 12px; color: #000000;"><%= v.character || '—' %></td>
+          <td style="padding: 12px; text-align: right; color: #303493; font-weight: 700;">Rs. <%= (v.amount||0).toLocaleString('en-IN') %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <div style="text-align: right; margin-top: 15px; padding-top: 15px; border-top: 2px solid #303493;">
+      <div style="font-size: 13px; display: inline-block;">
+        <strong style="color: #000000;">Total</strong>
+        <span style="display: inline-block; width: 200px; text-align: right; color: #303493; font-weight: 700; font-size: 15px;">Rs. <%= vouchers.reduce((s,v)=>s+(v.amount||0),0).toLocaleString('en-IN') %></span>
+      </div>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Bank Details -->
+  <div style="margin-bottom: 35px; padding: 18px; background: #f5f7ff; border-left: 4px solid #303493; border-radius: 4px; font-size: 12px;">
+    <div style="margin-bottom: 6px; color: #000000;"><strong>A/C Name :</strong> South Indian Cine, Television Artistes and Dubbing Artistes Union</div>
+    <div style="margin-bottom: 6px; color: #000000;"><strong>A/C NO. :</strong> 1616135000004793</div>
+    <div style="margin-bottom: 6px; color: #000000;"><strong>IFSC CODE :</strong> KVBL0001616</div>
+    <div style="margin-bottom: 6px; color: #000000;"><strong>BANK :</strong> KARUR VYSYA BANK, K.K.Nagar Branch</div>
+    <div style="color: #000000;"><strong>PAN NO. :</strong> AADAS9061M</div>
+  </div>
+
+  <!-- Payment History -->
+  <% if (payments.length > 0) { %>
+  <div style="margin-bottom: 35px;">
+    <div style="font-size: 13px; font-weight: 700; margin-bottom: 15px; color: #303493; padding-bottom: 10px; border-bottom: 2px solid #303493;">Payment History</div>
+
+    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+      <thead>
+        <tr style="background: #303493; color: white;">
+          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">ID</th>
+          <th style="padding: 12px; text-align: left; font-weight: 700; border: none; width: 15%;">Transaction Date</th>
+          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">Payment Type</th>
+          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">Notes</th>
+          <th style="padding: 12px; text-align: right; font-weight: 700; border: none;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% payments.forEach((p, idx) => { %>
+        <tr style="border-bottom: 1px solid #e0e0e0; background: <%= idx % 2 === 0 ? '#f9f9f9' : '#fff' %>;">
+          <td style="padding: 12px; color: #000000;"><%= p.id %></td>
+          <td style="padding: 12px; color: #000000;"><%= p.transaction_date %></td>
+          <td style="padding: 12px; color: #000000; font-weight: 500;"><%= p.payment_type %></td>
+          <td style="padding: 12px; color: #000000;"><%= p.notes || '—' %></td>
+          <td style="padding: 12px; text-align: right; color: #303493; font-weight: 700;">Rs. <%= p.amount.toLocaleString('en-IN') %></td>
+        </tr>
+        <% }) %>
+        <tr style="background: #303493; color: white; font-weight: 700;">
+          <td colspan="4" style="padding: 12px; text-align: right;">Total Amount Received</td>
+          <td style="padding: 12px; text-align: right;">Rs. <%= totalPaid.toLocaleString('en-IN') %></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+
+  <div style="border-top: 2px solid #303493; margin-bottom: 30px; padding-top: 30px;"></div>
+
+  <!-- Signature Section -->
+  <div style="display: flex; justify-content: space-around; margin-bottom: 20px; font-size: 12px;">
+    <div style="text-align: center;">
+      <div style="height: 45px; margin-bottom: 12px;"></div>
+      <div style="border-top: 2px solid #000000; padding-top: 8px; color: #000000; font-weight: 600;">Co-ordinator<br>Mr.C.D.Ananthraman</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="height: 45px; margin-bottom: 12px;"></div>
+      <div style="border-top: 2px solid #000000; padding-top: 8px; color: #000000; font-weight: 600;">Manager / Secretary<br>Treasurer</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="height: 45px; margin-bottom: 12px;"></div>
+      <div style="border-top: 2px solid #000000; padding-top: 8px; color: #000000; font-weight: 600;">For <%= project.production_company %></div>
+    </div>
+  </div>
+
+  <div style="font-size: 11px; color: #999; text-align: center; margin-top: 20px; font-style: italic;">
+    *Cheque subject to realisation
+  </div>
+
+</div>

@@ -1,0 +1,30 @@
+{
+  "name": "sictadau",
+  "version": "1.0.0",
+  "description": "South Indian Cine, Television Artistes and Dubbing Artistes Union - Billing Software",
+  "main": "app.js",
+  "scripts": {
+    "start": "node --experimental-sqlite app.js",
+    "dev": "nodemon --exec 'node --experimental-sqlite' app.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "connect-flash": "^0.1.1",
+    "connect-sqlite3": "^0.9.15",
+    "csurf": "^1.11.0",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-ejs-layouts": "^2.5.1",
+    "express-rate-limit": "^7.3.1",
+    "express-session": "^1.18.0",
+    "helmet": "^7.1.0",
+    "html-pdf": "^3.0.1",
+    "method-override": "^3.0.0",
+    "multer": "^1.4.5-lts.1",
+    "pdfkit": "^0.15.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.3"
+  }
+}

@@ -1,0 +1,121 @@
+<% activePage = 'members'; %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0"><%= member.full_name %></h4>
+    <small class="text-muted">Member No: <%= member.membership_no %></small>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/members/<%= member.id %>/edit" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil me-1"></i>Edit</a>
+    <form action="/members/<%= member.id %>" method="POST" class="d-inline">
+      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+      <input type="hidden" name="_method" value="DELETE">
+      <button type="submit" class="btn btn-sm btn-outline-danger" data-confirm="Delete this member permanently?">
+        <i class="bi bi-trash me-1"></i>Delete
+      </button>
+    </form>
+    <a href="/members" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm text-center p-4">
+      <% if (member.profile_picture) { %>
+        <img src="<%= member.profile_picture %>" alt="<%= member.full_name %>" style="width:120px;height:120px;border-radius:50%;object-fit:cover;margin:0 auto 1rem;" class="border">
+      <% } else { %>
+        <div style="width:120px;height:120px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:3rem;color:#9ca3af;">
+          <i class="bi bi-person"></i>
+        </div>
+      <% } %>
+      <h5 class="fw-bold"><%= member.full_name %></h5>
+      <span class="badge badge-<%= member.status.toLowerCase() %> px-3 py-2 mb-2"><%= member.status %></span>
+      <div class="text-muted small"><%= member.member_type %> Member</div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body">
+            <div class="form-section-title">Personal Details</div>
+            <div class="row g-2">
+              <% const fields = [
+                ['Membership No', member.membership_no], ['Gender', member.gender],
+                ['Date of Birth', member.dob ? member.dob.split(' ')[0] : null], ['Blood Group', member.blood_group],
+                ['Contact No', member.contact_no], ['Whatsapp', member.whatsapp_no],
+                ['Email', member.email], ['Admission Year', member.admission_year],
+                ['Languages', member.languages.join(', ')], ['Slang', member.slang],
+                ['Qualification', member.qualification], ['Experience', member.years_experience ? member.years_experience + ' yrs' : null],
+                ['Family Members', member.family_members], ['Nominee', member.nominee]
+              ]; %>
+              <% fields.forEach(([label, val]) => { if (!val) return; %>
+              <div class="col-md-6">
+                <div class="small text-muted"><%= label %></div>
+                <div class="small fw-medium"><%= val %></div>
+              </div>
+              <% }) %>
+              <% if (member.address) { %>
+              <div class="col-12">
+                <div class="small text-muted">Address</div>
+                <div class="small"><%= member.address %></div>
+              </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body">
+            <div class="form-section-title">Bank Details</div>
+            <div class="row g-2">
+              <% [['Bank Name', member.bank_name], ['Account No', member.bank_account_no], ['IFSC', member.ifsc_code], ['Aadhaar', member.aadhaar_no]].forEach(([label, val]) => { %>
+              <div class="col-md-6">
+                <div class="small text-muted"><%= label %></div>
+                <div class="small fw-medium"><%= val || '—' %></div>
+              </div>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vouchers -->
+  <div class="col-12">
+    <div class="table-card card">
+      <div class="card-header d-flex justify-content-between align-items-center py-2">
+        <span class="fw-semibold">Recent Vouchers</span>
+        <a href="/vouchers/create?member_id=<%= member.id %>" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-plus-lg me-1"></i>New Voucher
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>#</th><th>Project</th><th>Character</th><th>Amount</th><th>Final</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <% if (vouchers.length === 0) { %>
+            <tr><td colspan="7" class="text-center text-muted py-3 small">No vouchers yet</td></tr>
+            <% } else { %>
+            <% vouchers.forEach(v => { %>
+            <tr>
+              <td class="small text-muted">#<%= v.id %></td>
+              <td class="small"><%= v.film_name %></td>
+              <td class="small"><%= v.character || '—' %></td>
+              <td class="small">₹<%= (v.amount||0).toLocaleString('en-IN') %></td>
+              <td class="small fw-medium">₹<%= (v.final_amount||0).toLocaleString('en-IN') %></td>
+              <td><span class="badge badge-<%= v.status.toLowerCase() %>"><%= v.status %></span></td>
+              <td><a href="/vouchers/<%= v.id %>/show" class="btn btn-xs btn-outline-secondary" style="font-size:0.75rem;padding:2px 8px;">View</a></td>
+            </tr>
+            <% }) %>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

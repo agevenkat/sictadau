@@ -1,0 +1,47 @@
+<div class="row g-2">
+  <div class="col-md-6">
+    <label class="form-label">Date <span class="text-danger">*</span></label>
+    <input type="date" name="transaction_date" class="form-control" value="<%= new Date().toISOString().split('T')[0] %>" required>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Payment Mode</label>
+    <select name="payment_mode" class="form-select select2-search" id="payment_mode_select">
+      <% ['Cash','NEFT','Cheque','Others'].forEach(m => { %><option><%= m %></option><% }) %>
+    </select>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Income / Expense Type</label>
+    <input type="text" name="income_type" class="form-control" list="income_types_list" placeholder="Type or select...">
+    <datalist id="income_types_list">
+      <% ['Artist Payment','GW Fund','Representative Commission','Office Maintenance','Tea, Coffee, Water','Transportation','Pooja Expenses','Salary','Membership Fee','Other'].forEach(t => { %>
+      <option value="<%= t %>">
+      <% }) %>
+    </datalist>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Paid To / Received From</label>
+    <input type="text" name="paid_to" class="form-control" placeholder="Name">
+  </div>
+  <div class="col-12">
+    <label class="form-label">Movie / Project</label>
+    <select name="project_id" class="form-select select2-search" id="statement_project_select">
+      <option value="">— None —</option>
+      <% projects.forEach(p => { %><option value="<%= p.id %>"><%= p.film_name %></option><% }) %>
+    </select>
+  </div>
+  <div class="col-12">
+    <label class="form-label">Transaction Remarks</label>
+    <textarea name="transaction_remarks" class="form-control" rows="2" placeholder="Details..."></textarea>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Amount <span class="text-danger">*</span></label>
+    <div class="input-group">
+      <span class="input-group-text">₹</span>
+      <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Receipt <small class="text-muted">(PDF/Image)</small></label>
+    <input type="file" name="receipt" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+  </div>
+</div>

@@ -1,0 +1,56 @@
+<% activePage = 'users'; %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0">Edit User</h4>
+  <a href="/users" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<% if (errors && errors.length) { %>
+<div class="alert alert-danger"><ul class="mb-0 ps-3"><% errors.forEach(e => { %><li><%= e %></li><% }) %></ul></div>
+<% } %>
+
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="form-card">
+      <form action="/users/<%= user.id %>" method="POST">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <input type="hidden" name="_method" value="PUT">
+        <div class="mb-3">
+          <label class="form-label">Full Name <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" value="<%= user.name %>" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email Address <span class="text-danger">*</span></label>
+          <input type="email" name="email" class="form-control" value="<%= user.email %>" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Role</label>
+          <select name="role" class="form-select select2-search">
+            <option value="staff" <%= user.role === 'staff' ? 'selected' : '' %>>Staff</option>
+            <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
+            <option value="superadmin" <%= user.role === 'superadmin' ? 'selected' : '' %>>Super Admin</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Status</label>
+          <select name="is_active" class="form-select select2-search">
+            <option value="1" <%= user.is_active ? 'selected' : '' %>>Active</option>
+            <option value="0" <%= !user.is_active ? 'selected' : '' %>>Inactive</option>
+          </select>
+        </div>
+        <hr>
+        <p class="small text-muted">Leave password fields blank to keep current password.</p>
+        <div class="mb-3">
+          <label class="form-label">New Password</label>
+          <input type="password" name="new_password" class="form-control" autocomplete="new-password">
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Confirm New Password</label>
+          <input type="password" name="confirm_password" class="form-control" autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Save Changes</button>
+      </form>
+    </div>
+  </div>
+</div>
+

@@ -1,0 +1,155 @@
+<% activePage = 'statements'; %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0">Statement</h4>
+    <small class="text-muted">
+      Credit: <span class="text-success fw-medium">₹<%= Math.round(totals.total_credit||0).toLocaleString('en-IN') %></span> &bull;
+      Debit: <span class="text-danger fw-medium">₹<%= Math.round(totals.total_debit||0).toLocaleString('en-IN') %></span> &bull;
+      Balance: <span class="<%= balance >= 0 ? 'text-success' : 'text-danger' %> fw-bold">₹<%= Math.round(Math.abs(balance)).toLocaleString('en-IN') %> <%= balance >= 0 ? 'Cr' : 'Dr' %></span>
+    </small>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
+      <i class="bi bi-plus-lg me-1"></i>Add Expense
+    </button>
+    <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#addIncomeModal">
+      <i class="bi bi-plus-lg me-1"></i>Add Income
+    </button>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-3 border-0 shadow-sm">
+  <div class="card-body py-2">
+    <form class="row g-2 align-items-end" method="GET">
+      <div class="col-md-3">
+        <input type="text" name="search" class="form-control form-control-sm" placeholder="Search..." value="<%= search %>">
+      </div>
+      <div class="col-md-2">
+        <select name="type" class="form-select form-select-sm">
+          <option value="">All</option>
+          <option value="Debit" <%= type === 'Debit' ? 'selected' : '' %>>Debit</option>
+          <option value="Credit" <%= type === 'Credit' ? 'selected' : '' %>>Credit</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <input type="date" name="from" class="form-control form-control-sm" value="<%= from %>" placeholder="From">
+      </div>
+      <div class="col-md-2">
+        <input type="date" name="to" class="form-control form-control-sm" value="<%= to %>" placeholder="To">
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-primary">Filter</button>
+        <a href="/statements" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+      </div>
+    </form>
+    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle"></i> Click column headers to sort • Default: Latest first</small>
+  </div>
+</div>
+
+<div class="table-card card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table id="stmtTable" class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Transaction Date</th>
+            <th>Income Type</th>
+            <th>Paid To</th>
+            <th>Movie Name</th>
+            <th>Payment Mode</th>
+            <th>Transaction Remarks</th>
+            <th>Amount Type</th>
+            <th>Amount</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% statements.forEach(s => { %>
+          <tr>
+            <td class="small"><%= new Date(s.transaction_date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) %></td>
+            <td class="small"><%= s.income_type || '—' %></td>
+            <td class="small"><%= s.paid_to || '—' %></td>
+            <td class="small text-muted"><%= s.film_name || '—' %></td>
+            <td class="small"><%= s.payment_mode || '—' %></td>
+            <td class="small text-muted" style="max-width:200px;"><%= s.transaction_remarks || '—' %></td>
+            <td>
+              <span class="badge <%= s.amount_type === 'Debit' ? 'bg-danger' : 'bg-success' %>"><%= s.amount_type %></span>
+            </td>
+            <td class="small fw-medium <%= s.amount_type === 'Debit' ? 'text-danger' : 'text-success' %>">
+              Rs. <%= (s.amount||0).toLocaleString('en-IN') %>
+            </td>
+            <td>
+              <% if (s.receipt) { %>
+                <a href="/statements/<%= s.id %>/receipt" class="btn btn-xs btn-outline-primary" style="font-size:0.75rem;padding:2px 6px;" target="_blank">View Receipt</a>
+              <% } %>
+              <a href="/statements/<%= s.id %>/receipt" class="btn btn-xs btn-outline-secondary" style="font-size:0.75rem;padding:2px 6px;" target="_blank">View</a>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add Expense Modal -->
+<div class="modal fade" id="addExpenseModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Expense</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="/statements" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <input type="hidden" name="amount_type" value="Debit">
+        <div class="modal-body">
+          <%- include('../partials/statement_form', { isCredit: false }) %>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">Add Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Add Income Modal -->
+<div class="modal fade" id="addIncomeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Income</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="/statements" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <input type="hidden" name="amount_type" value="Credit">
+        <div class="modal-body">
+          <%- include('../partials/statement_form', { isCredit: true }) %>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">Add Income</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+$(function(){
+  initDataTable('#stmtTable', {
+    order: [[0, 'desc']], // Latest statements first
+    pageLength: 100,
+    columnDefs: [
+      { orderable: false, targets: [6, 8] },
+      { responsivePriority: 1, targets: [1, 7] },
+      { responsivePriority: 2, targets: [2] }
+    ]
+  });
+});
+</script>

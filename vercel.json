@@ -1,0 +1,19 @@
+{
+  "buildCommand": "npm install",
+  "env": {
+    "NODE_OPTIONS": "--experimental-sqlite"
+  },
+  "functions": {
+    "app.js": {
+      "runtime": "nodejs18.x",
+      "memory": 1024,
+      "timeout": 60
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "app.js"
+    }
+  ]
+}

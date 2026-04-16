@@ -1,0 +1,152 @@
+<% activePage = 'vouchers'; %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0"><%= typeof isEdit !== 'undefined' && isEdit ? 'Edit Voucher' : 'New Vouchers' %></h4>
+  <a href="/vouchers" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Vouchers</a>
+</div>
+
+<% if (errors && errors.length) { %>
+<div class="alert alert-danger"><ul class="mb-0 ps-3"><% errors.forEach(e => { %><li><%= e %></li><% }) %></ul></div>
+<% } %>
+
+<form action="/vouchers<%= typeof isEdit !== 'undefined' && isEdit ? '/' + voucher.id : '' %>" method="POST">
+  <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+  <% if (typeof isEdit !== 'undefined' && isEdit) { %><input type="hidden" name="_method" value="PUT"><% } %>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="form-card">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Voucher Type</label>
+            <select name="voucher_type" class="form-select">
+              <option value="Artist" <%= voucher.voucher_type === 'Artist' ? 'selected' : '' %>>Artist</option>
+              <option value="Technical" <%= voucher.voucher_type === 'Technical' ? 'selected' : '' %>>Technical</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Recipient Name <span class="text-danger">*</span></label>
+            <select name="member_id" id="member_select" class="form-select select2-search" required>
+              <option value="">— Select Member —</option>
+              <% members.forEach(m => { %>
+                <option value="<%= m.id %>" <%= voucher.member_id == m.id ? 'selected' : '' %>>
+                  (<%= m.membership_no %>) <%= m.full_name %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Movie Name <span class="text-danger">*</span></label>
+            <select name="project_id" id="project_select" class="form-select select2-search" required>
+              <option value="">— Select Project —</option>
+              <% projects.forEach(p => { %>
+                <option value="<%= p.id %>" data-rep="<%= p.representative_id || '' %>" <%= voucher.project_id == p.id ? 'selected' : '' %>>
+                  <%= p.film_name %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Representative Name</label>
+            <select name="representative_id" id="rep_select" class="form-select select2-search">
+              <option value="">— Select —</option>
+              <% reps.forEach(r => { %>
+                <option value="<%= r.id %>" <%= voucher.representative_id == r.id ? 'selected' : '' %>><%= r.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Character</label>
+            <select name="character" class="form-select">
+              <option value="">— Select —</option>
+              <% CHARACTERS.forEach(c => { %><option value="<%= c %>" <%= voucher.character === c ? 'selected' : '' %>><%= c %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Status</label>
+            <select name="status" class="form-select">
+              <option value="Pending" <%= voucher.status === 'Pending' ? 'selected' : '' %>>Pending</option>
+              <option value="Paid" <%= voucher.status === 'Paid' ? 'selected' : '' %>>Paid</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="form-card">
+        <div class="form-section-title">Amount Calculation</div>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Amount (Gross) <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">₹</span>
+              <input type="number" name="amount" id="amount" class="form-control" value="<%= voucher.amount || '' %>" step="0.01" min="0" required>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">GW Fund %</label>
+            <div class="input-group">
+              <select name="gw_fund_percent" id="gw_fund_percent" class="form-select">
+                <% [5,10].forEach(p => { %><option value="<%= p %>" <%= voucher.gw_fund_percent == p ? 'selected' : '' %>><%= p %>%</option><% }) %>
+              </select>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">GW Fund Amount</label>
+            <div class="input-group">
+              <span class="input-group-text">₹</span>
+              <input type="number" id="gw_fund_amount" class="form-control bg-light" value="<%= voucher.gw_fund_amount || '' %>" readonly>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Representative %</label>
+            <select name="representative_percent" id="representative_percent" class="form-select">
+              <% [0,5,10].forEach(p => { %><option value="<%= p %>" <%= voucher.representative_percent == p ? 'selected' : '' %>><%= p %>%</option><% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Representative Amount</label>
+            <div class="input-group">
+              <span class="input-group-text">₹</span>
+              <input type="number" id="representative_amount" class="form-control bg-light" value="<%= voucher.representative_amount || '' %>" readonly>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-bold">Final Amount</label>
+            <div class="input-group">
+              <span class="input-group-text fw-bold">₹</span>
+              <input type="number" id="final_amount" class="form-control bg-light fw-bold" value="<%= voucher.final_amount || '' %>" readonly>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">
+      <% if (typeof isEdit !== 'undefined' && isEdit) { %>Update Voucher<% } else { %>Create<% } %>
+    </button>
+    <% if (typeof isEdit === 'undefined' || !isEdit) { %>
+    <button type="submit" name="_action" value="create_close" class="btn btn-secondary">Create and close</button>
+    <% } %>
+    <a href="/vouchers" class="btn btn-link text-muted">or Cancel</a>
+  </div>
+</form>
+
+<script>
+$(function() {
+  // Auto-set rep when project changes
+  $('#project_select').on('change', function() {
+    const repId = this.options[this.selectedIndex]?.dataset?.rep;
+    if (repId) {
+      $('#rep_select').val(repId).trigger('change');
+    }
+    calcVoucherAmounts();
+  });
+
+  // Initial calc
+  calcVoucherAmounts();
+});
+</script>
