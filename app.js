@@ -1,15 +1,39 @@
 require('dotenv').config();
+
+// Catch any unhandled startup errors and log them clearly
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err.message);
+  console.error(err.stack);
+});
+
+let db;
+try {
+  db = require('./database/db');
+  console.log('DB loaded OK');
+} catch (e) {
+  console.error('FATAL: DB load failed:', e.message, e.stack);
+  throw e;
+}
+
 const express = require('express');
 const path = require('path');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
+
+let SQLiteStore;
+try {
+  SQLiteStore = require('connect-sqlite3')(session);
+  console.log('SQLiteStore loaded OK');
+} catch (e) {
+  console.error('FATAL: connect-sqlite3 failed:', e.message);
+  throw e;
+}
+
 const flash = require('connect-flash');
 const helmet = require('helmet');
 const methodOverride = require('method-override');
 const expressLayouts = require('express-ejs-layouts');
 const csrf = require('csurf');
 const bcrypt = require('bcrypt');
-const db = require('./database/db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
