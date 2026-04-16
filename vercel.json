@@ -1,19 +1,18 @@
 {
-  "buildCommand": "npm install",
-  "env": {
-    "NODE_OPTIONS": "--experimental-sqlite"
-  },
-  "functions": {
-    "app.js": {
-      "runtime": "nodejs18.x",
-      "memory": 1024,
-      "timeout": 60
+  "version": 2,
+  "builds": [
+    {
+      "src": "app.js",
+      "use": "@vercel/node"
     }
-  },
+  ],
   "routes": [
     {
       "src": "/(.*)",
       "dest": "app.js"
     }
-  ]
+  ],
+  "env": {
+    "NODE_OPTIONS": "--experimental-sqlite"
+  }
 }
