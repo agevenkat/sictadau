@@ -3,8 +3,9 @@ node_modules/
 .env.local
 .DS_Store
 *.log
-database/*.db
 database/*.db-*
+database/sessions.db
+# sictadau.db is included for Vercel (copied to /tmp at runtime)
 public/uploads/*
 !public/uploads/.gitkeep
 sessions.db*

@@ -55,9 +55,10 @@ app.use(methodOverride((req) => {
 app.use(methodOverride('_method'));
 
 // ---- Session ----
+const sessionDir = process.env.VERCEL === '1' ? '/tmp' : './database';
 app.use(session({
-  store: new SQLiteStore({ db: 'sessions.db', dir: './database' }),
-  secret: process.env.SESSION_SECRET,
+  store: new SQLiteStore({ db: 'sessions.db', dir: sessionDir }),
+  secret: process.env.SESSION_SECRET || 'sictadau-fallback-secret-change-in-prod',
   resave: false,
   saveUninitialized: false,
   name: 'sictadau.sid',
@@ -116,22 +117,28 @@ app.use((err, req, res, next) => {
 
 // ---- Seed first superadmin if no users exist ----
 async function seedAdmin() {
-  const count = db.prepare('SELECT COUNT(*) as cnt FROM users').get().cnt;
-  if (count === 0) {
-    const hash = await bcrypt.hash('Admin@1234', 12);
-    db.prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'superadmin')")
-      .run('Administrator', 'admin@sictadau.org', hash);
-    console.log('');
-    console.log('✅  Default admin created:');
-    console.log('    Email   : admin@sictadau.org');
-    console.log('    Password: Admin@1234');
-    console.log('    ⚠️   Change this password immediately after first login!');
-    console.log('');
+  try {
+    const count = db.prepare('SELECT COUNT(*) as cnt FROM users').get().cnt;
+    if (count === 0) {
+      const hash = await bcrypt.hash('Admin@1234', 12);
+      db.prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'superadmin')")
+        .run('Administrator', 'admin@sictadau.org', hash);
+      console.log('✅  Default admin created: admin@sictadau.org / Admin@1234');
+    }
+  } catch (e) {
+    console.error('seedAdmin error:', e.message);
   }
 }
 
-seedAdmin().then(() => {
+// Run seed (non-blocking)
+seedAdmin();
+
+// ---- Local dev: start server; Vercel: export app ----
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
     console.log(`🚀  SICTADAU running at http://localhost:${PORT}`);
   });
-});
+}
+
+module.exports = app;

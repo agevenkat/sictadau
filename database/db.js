@@ -3,7 +3,25 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const DB_PATH = process.env.DATABASE_PATH || './database/sictadau.db';
+// On Vercel (serverless), only /tmp is writable. Copy the bundled DB there on first run.
+function resolveDbPath() {
+  if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH;
+
+  const isVercel = process.env.VERCEL === '1';
+  if (isVercel) {
+    const tmpDb = '/tmp/sictadau.db';
+    const srcDb = path.join(__dirname, 'sictadau.db');
+    if (!fs.existsSync(tmpDb) && fs.existsSync(srcDb)) {
+      fs.copyFileSync(srcDb, tmpDb);
+      console.log('DB copied to /tmp/sictadau.db');
+    }
+    return tmpDb;
+  }
+
+  return path.join(__dirname, 'sictadau.db');
+}
+
+const DB_PATH = resolveDbPath();
 const dbDir = path.dirname(DB_PATH);
 
 if (!fs.existsSync(dbDir)) {
