@@ -9,3 +9,4 @@ public/uploads/*
 !public/uploads/.gitkeep
 sessions.db*
 .vercel
+package-lock.json

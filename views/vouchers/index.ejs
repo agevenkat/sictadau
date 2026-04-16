@@ -98,9 +98,7 @@
 <script>
 $(function(){
   initDataTable('#vouchersTable', {
-    order: [[0, 'desc']], // Latest vouchers first
-    pageLength: 100,
-    pagingType: 'simple', // Prev/Next buttons only
+    order: [[0, 'desc']],
     columnDefs: [
       { orderable: false, targets: [7, 8] },
       { responsivePriority: 1, targets: [1, 7] },

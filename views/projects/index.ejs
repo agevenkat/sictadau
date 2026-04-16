@@ -77,9 +77,7 @@
 <script>
 $(function(){
   initDataTable('#projectsTable', {
-    order: [[0, 'desc']], // Latest projects first
-    pageLength: 100,
-    pagingType: 'simple', // Prev/Next buttons only
+    order: [[0, 'desc']],
     columnDefs: [
       { orderable: false, targets: [7] },
       { responsivePriority: 1, targets: [3, 6] },

@@ -88,9 +88,7 @@
 <script>
 $(function(){
   initDataTable('#membersTable', {
-    order: [[2, 'desc']], // Latest members first
-    pageLength: 100,
-    pagingType: 'simple', // Prev/Next buttons only
+    order: [[0, 'asc']],
     columnDefs: [
       { orderable: false, targets: [1, 9] },
       {

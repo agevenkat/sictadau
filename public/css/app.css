@@ -983,3 +983,75 @@ div.dt-buttons button:hover {
   background: var(--primary-dark) !important;
   transform: translateY(-2px);
 }
+
+/* ── DataTables Pagination ─────────────────────────────── */
+div.dataTables_wrapper div.dataTables_paginate {
+  margin: 0;
+  padding: 0;
+}
+
+div.dataTables_wrapper div.dataTables_paginate .pagination {
+  margin: 0;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+div.dataTables_wrapper div.dataTables_paginate .pagination .page-item .page-link {
+  border-radius: 6px !important;
+  font-size: 0.8rem;
+  padding: 5px 10px;
+  color: #303493;
+  border-color: #dee2e6;
+  min-width: 34px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+div.dataTables_wrapper div.dataTables_paginate .pagination .page-item.active .page-link {
+  background-color: #303493;
+  border-color: #303493;
+  color: #fff;
+  font-weight: 600;
+}
+
+div.dataTables_wrapper div.dataTables_paginate .pagination .page-item .page-link:hover {
+  background-color: #e8e9f8;
+  border-color: #303493;
+  color: #303493;
+}
+
+div.dataTables_wrapper div.dataTables_paginate .pagination .page-item.disabled .page-link {
+  color: #aaa;
+  pointer-events: none;
+}
+
+/* ── Length menu ───────────────────────────────────────── */
+div.dataTables_wrapper div.dataTables_length {
+  padding: 0.25rem 0;
+}
+
+div.dataTables_wrapper div.dataTables_length select {
+  display: inline-block;
+  width: auto;
+  padding: 4px 28px 4px 10px;
+  font-size: 0.8rem;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  color: #333;
+  background-color: #fff;
+  cursor: pointer;
+  margin: 0 4px;
+}
+
+div.dataTables_wrapper div.dataTables_length select:focus {
+  border-color: #303493;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(48, 52, 147, 0.15);
+}
+
+/* ── Info text ─────────────────────────────────────────── */
+div.dataTables_wrapper div.dataTables_info {
+  font-size: 0.8rem;
+  color: #666;
+  padding: 6px 0;
+}

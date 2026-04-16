@@ -43,10 +43,10 @@ function initDataTable(selector, opts = {}) {
   if (!$.fn.DataTable) return;
 
   const defaults = {
-    // Layout and DOM structure
-    dom: "<'row mb-3'<'col-sm-12 col-md-6'B><'col-sm-12 col-md-6'f>>" +
+    // Layout and DOM structure — B=buttons, l=length, f=search, t=table, i=info, p=pagination
+    dom: "<'row mb-2'<'col-sm-12 col-md-5'B><'col-sm-6 col-md-3'l><'col-sm-6 col-md-4'f>>" +
          "<'row'<'col-sm-12'tr>>" +
-         "<'row mt-3'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+         "<'row mt-2 align-items-center'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7 d-flex justify-content-end'p>>",
 
     // Export buttons
     buttons: [
@@ -83,9 +83,9 @@ function initDataTable(selector, opts = {}) {
     ],
 
     // Pagination and display
-    pageLength: 100,
-    lengthMenu: [[100, 250, 500, -1], ['100', '250', '500', 'All']],
-    pagingType: 'simple',
+    pageLength: 25,
+    lengthMenu: [[25, 50, 100, -1], ['25', '50', '100', 'All']],
+    pagingType: 'simple_numbers',
 
     // Responsiveness
     responsive: true,
@@ -94,16 +94,16 @@ function initDataTable(selector, opts = {}) {
     // Search
     language: {
       search: '_INPUT_',
-      searchPlaceholder: 'Search records...',
-      lengthMenu: 'Show _MENU_ records',
-      info: 'Showing _START_ to _END_ of _TOTAL_ records',
+      searchPlaceholder: 'Search...',
+      lengthMenu: '_MENU_ per page',
+      info: 'Showing _START_–_END_ of _TOTAL_',
       infoEmpty: 'No records found',
-      infoFiltered: '(filtered from _MAX_ total records)',
+      infoFiltered: '(filtered from _MAX_)',
       paginate: {
-        first: '<i class="bi bi-chevron-bar-left"></i>',
-        last: '<i class="bi bi-chevron-bar-right"></i>',
-        next: '<i class="bi bi-chevron-right"></i>',
-        previous: '<i class="bi bi-chevron-left"></i>'
+        first: '«',
+        last: '»',
+        next: '›',
+        previous: '‹'
       }
     },
 
