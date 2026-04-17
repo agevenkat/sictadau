@@ -5,13 +5,17 @@ require('dotenv').config();
 
 // On Vercel (serverless), only /tmp is writable.
 // Always use a fresh DB at /tmp — schema + seed runs on every cold start.
+const IS_VERCEL = process.env.VERCEL === '1';
+
 function resolveDbPath() {
   if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH;
 
-  if (process.env.VERCEL === '1') {
+  if (IS_VERCEL) {
     const tmpDb = '/tmp/sictadau.db';
-    // Remove any stale/corrupt file from a previous run
-    try { if (fs.existsSync(tmpDb)) fs.unlinkSync(tmpDb); } catch (_) {}
+    // Remove any stale/corrupt files from a previous run (including WAL/SHM)
+    for (const f of [tmpDb, tmpDb + '-wal', tmpDb + '-shm', tmpDb + '-journal']) {
+      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (_) {}
+    }
     console.log('Vercel: using fresh DB at', tmpDb);
     return tmpDb;
   }
@@ -26,12 +30,17 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
+console.log('Opening SQLite at:', DB_PATH);
 const db = new DatabaseSync(DB_PATH);
+console.log('SQLite opened OK');
 
-// Performance pragmas
-db.exec('PRAGMA journal_mode = WAL');
+// Vercel Lambda may not support WAL mode (requires shared memory file locking).
+// Use DELETE journal mode instead — simpler, works everywhere.
+if (!IS_VERCEL) {
+  db.exec('PRAGMA journal_mode = WAL');
+  db.exec('PRAGMA busy_timeout = 5000');
+}
 db.exec('PRAGMA foreign_keys = ON');
-db.exec('PRAGMA busy_timeout = 5000');
 
 // Run schema
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
