@@ -5,7 +5,16 @@
       "src": "app.js",
       "use": "@vercel/node",
       "config": {
-        "maxLambdaSize": "50mb"
+        "maxLambdaSize": "100mb",
+        "includeFiles": [
+          "database/**",
+          "views/**",
+          "public/**",
+          "middleware/**",
+          "controllers/**",
+          "routes/**",
+          ".env.example"
+        ]
       }
     }
   ],

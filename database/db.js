@@ -3,17 +3,37 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-// On Vercel (serverless), only /tmp is writable. Copy the bundled DB there on first run.
+// On Vercel (serverless), only /tmp is writable.
+// Copy the bundled DB to /tmp on first run, or create fresh if not found.
 function resolveDbPath() {
   if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH;
 
   const isVercel = process.env.VERCEL === '1';
   if (isVercel) {
     const tmpDb = '/tmp/sictadau.db';
-    const srcDb = path.join(__dirname, 'sictadau.db');
-    if (!fs.existsSync(tmpDb) && fs.existsSync(srcDb)) {
-      fs.copyFileSync(srcDb, tmpDb);
-      console.log('DB copied to /tmp/sictadau.db');
+    if (!fs.existsSync(tmpDb)) {
+      // Try to copy from bundled location
+      const candidates = [
+        path.join(__dirname, 'sictadau.db'),
+        path.join(process.cwd(), 'database', 'sictadau.db'),
+        '/var/task/database/sictadau.db'
+      ];
+      let copied = false;
+      for (const srcDb of candidates) {
+        try {
+          if (fs.existsSync(srcDb)) {
+            fs.copyFileSync(srcDb, tmpDb);
+            console.log('DB copied from', srcDb, 'to', tmpDb);
+            copied = true;
+            break;
+          }
+        } catch (e) {
+          console.warn('Copy attempt failed from', srcDb, ':', e.message);
+        }
+      }
+      if (!copied) {
+        console.log('No source DB found — starting with fresh database at', tmpDb);
+      }
     }
     return tmpDb;
   }
