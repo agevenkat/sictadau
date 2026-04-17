@@ -1,7 +1,6 @@
 const db = require('../database/db');
 const path = require('path');
 const fs = require('fs');
-const pdf = require('html-pdf');
 
 const LANGUAGES = ['Tamil', 'Telugu', 'Malayalam', 'Kannada', 'Hindi', 'English'];
 const STATUSES = ['Pending', 'Completed', 'Paid'];
@@ -123,7 +122,13 @@ exports.invoice = (req, res) => {
 };
 
 exports.downloadInvoice = (req, res) => {
+  // html-pdf uses PhantomJS which is unavailable on serverless — redirect to printable HTML view
+  if (process.env.VERCEL === '1') {
+    return res.redirect(`/projects/${req.params.id}/invoice`);
+  }
+
   try {
+    const pdf = require('html-pdf');
     const project = db.prepare(`SELECT p.*, r.name as rep_name FROM projects p
       LEFT JOIN representatives r ON p.representative_id = r.id WHERE p.id = ?`).get(req.params.id);
     if (!project) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
