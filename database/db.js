@@ -4,37 +4,15 @@ const path = require('path');
 require('dotenv').config();
 
 // On Vercel (serverless), only /tmp is writable.
-// Copy the bundled DB to /tmp on first run, or create fresh if not found.
+// Always use a fresh DB at /tmp — schema + seed runs on every cold start.
 function resolveDbPath() {
   if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH;
 
-  const isVercel = process.env.VERCEL === '1';
-  if (isVercel) {
+  if (process.env.VERCEL === '1') {
     const tmpDb = '/tmp/sictadau.db';
-    if (!fs.existsSync(tmpDb)) {
-      // Try to copy from bundled location
-      const candidates = [
-        path.join(__dirname, 'sictadau.db'),
-        path.join(process.cwd(), 'database', 'sictadau.db'),
-        '/var/task/database/sictadau.db'
-      ];
-      let copied = false;
-      for (const srcDb of candidates) {
-        try {
-          if (fs.existsSync(srcDb)) {
-            fs.copyFileSync(srcDb, tmpDb);
-            console.log('DB copied from', srcDb, 'to', tmpDb);
-            copied = true;
-            break;
-          }
-        } catch (e) {
-          console.warn('Copy attempt failed from', srcDb, ':', e.message);
-        }
-      }
-      if (!copied) {
-        console.log('No source DB found — starting with fresh database at', tmpDb);
-      }
-    }
+    // Remove any stale/corrupt file from a previous run
+    try { if (fs.existsSync(tmpDb)) fs.unlinkSync(tmpDb); } catch (_) {}
+    console.log('Vercel: using fresh DB at', tmpDb);
     return tmpDb;
   }
 
