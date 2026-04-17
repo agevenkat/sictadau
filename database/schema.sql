@@ -1,7 +1,5 @@
 -- SICTADAU Database Schema
-
-PRAGMA foreign_keys = ON;
-PRAGMA journal_mode = WAL;
+-- (PRAGMAs are set in database/db.js, not here)
 
 -- App Users (max ~3 accounts)
 CREATE TABLE IF NOT EXISTS users (
