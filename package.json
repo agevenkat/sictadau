@@ -8,7 +8,7 @@
     "dev": "nodemon --exec 'node --experimental-sqlite' app.js"
   },
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.3",
     "connect-flash": "^0.1.1",
     "connect-sqlite3": "^0.9.15",
     "csurf": "^1.11.0",

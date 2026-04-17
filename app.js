@@ -24,7 +24,7 @@ const helmet = require('helmet');
 const methodOverride = require('method-override');
 const expressLayouts = require('express-ejs-layouts');
 const csrf = require('csurf');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
