@@ -8,10 +8,11 @@ require('dotenv').config();
 const IS_VERCEL = process.env.VERCEL === '1';
 
 function resolveDbPath() {
-  if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH;
-
   if (IS_VERCEL) {
-    const tmpDb = '/tmp/sictadau.db';
+    // On Vercel only /tmp is writable — ignore relative DATABASE_PATH env vars.
+    // Accept DATABASE_PATH only if it explicitly starts with /tmp/.
+    const envPath = process.env.DATABASE_PATH;
+    const tmpDb = (envPath && envPath.startsWith('/tmp/')) ? envPath : '/tmp/sictadau.db';
     // Remove any stale/corrupt files from a previous run (including WAL/SHM)
     for (const f of [tmpDb, tmpDb + '-wal', tmpDb + '-shm', tmpDb + '-journal']) {
       try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (_) {}
@@ -20,6 +21,7 @@ function resolveDbPath() {
     return tmpDb;
   }
 
+  if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH;
   return path.join(__dirname, 'sictadau.db');
 }
 
