@@ -19,15 +19,6 @@ const express = require('express');
 const path = require('path');
 const session = require('express-session');
 
-let SQLiteStore;
-try {
-  SQLiteStore = require('connect-sqlite3')(session);
-  console.log('SQLiteStore loaded OK');
-} catch (e) {
-  console.error('FATAL: connect-sqlite3 failed:', e.message);
-  throw e;
-}
-
 const flash = require('connect-flash');
 const helmet = require('helmet');
 const methodOverride = require('method-override');
@@ -79,9 +70,19 @@ app.use(methodOverride((req) => {
 app.use(methodOverride('_method'));
 
 // ---- Session ----
-const sessionDir = process.env.VERCEL === '1' ? '/tmp' : './database';
+// Use SQLite session store locally; MemoryStore on Vercel (serverless is stateless anyway)
+let sessionStore = undefined;
+if (process.env.VERCEL !== '1') {
+  try {
+    const SQLiteStore = require('connect-sqlite3')(session);
+    sessionStore = new SQLiteStore({ db: 'sessions.db', dir: './database' });
+  } catch (e) {
+    console.warn('connect-sqlite3 unavailable, using MemoryStore:', e.message);
+  }
+}
+
 app.use(session({
-  store: new SQLiteStore({ db: 'sessions.db', dir: sessionDir }),
+  store: sessionStore,
   secret: process.env.SESSION_SECRET || 'sictadau-fallback-secret-change-in-prod',
   resave: false,
   saveUninitialized: false,
