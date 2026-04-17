@@ -122,13 +122,8 @@ exports.invoice = (req, res) => {
 };
 
 exports.downloadInvoice = (req, res) => {
-  // html-pdf uses PhantomJS which is unavailable on serverless — redirect to printable HTML view
-  if (process.env.VERCEL === '1') {
-    return res.redirect(`/projects/${req.params.id}/invoice`);
-  }
-
   try {
-    const pdf = require('html-pdf');
+    const PDFDocument = require('pdfkit');
     const project = db.prepare(`SELECT p.*, r.name as rep_name FROM projects p
       LEFT JOIN representatives r ON p.representative_id = r.id WHERE p.id = ?`).get(req.params.id);
     if (!project) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
@@ -138,315 +133,190 @@ exports.downloadInvoice = (req, res) => {
 
     const payments = db.prepare('SELECT * FROM project_payments WHERE project_id = ? ORDER BY transaction_date').all(project.id);
     const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+    const balance = (project.amount || 0) - (project.payment_received || 0);
 
-    // Generate HTML for PDF
-    const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
-          color: #000000;
-          background: #fff;
-          padding: 40px;
-          line-height: 1.6;
-        }
-        .header {
-          margin-bottom: 30px;
-          display: flex;
-          justify-content: space-between;
-          border-bottom: 3px solid #303493;
-          padding-bottom: 20px;
-        }
-        .header-left { flex: 1; }
-        .header-right { text-align: right; }
-        .header-item { font-size: 13px; margin-bottom: 8px; color: #000000; }
-        .header-item strong { color: #000000; font-weight: 600; }
-        .header-right .invoice-no { color: #303493; font-size: 18px; }
-        .header-right .status { display: inline-block; padding: 4px 12px; border-radius: 4px; color: white; font-weight: 600; }
-        .status.paid { background: #303493; }
-        .status.pending { background: #EE3134; }
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    const filename = `Invoice-${project.id}-${project.film_name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
 
-        .from-to { display: flex; justify-content: space-between; margin-bottom: 35px; gap: 40px; }
-        .from-section, .to-section { flex: 1; }
-        .section-label { font-size: 11px; font-weight: 700; margin-bottom: 12px; color: #303493; letter-spacing: 0.5px; text-transform: uppercase; }
-        .section-content { font-size: 13px; line-height: 1.7; color: #000000; }
-        .section-content strong { color: #000000; font-weight: 600; display: block; margin-bottom: 6px; }
-        .section-content span { display: block; color: #000000; font-size: 12px; margin-bottom: 3px; }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    doc.pipe(res);
 
-        .summary {
-          background: linear-gradient(135deg, #303493 0%, #1a1d5e 100%);
-          padding: 28px;
-          margin-bottom: 35px;
-          border-radius: 8px;
-          display: flex;
-          justify-content: space-around;
-          text-align: center;
-        }
-        .summary-item { flex: 1; }
-        .summary-label { font-size: 10px; color: #ffffff; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-        .summary-value { font-size: 20px; font-weight: 700; color: #fff; }
-        .summary-item:nth-child(2), .summary-item:nth-child(4) { border-left: 2px solid rgba(255,255,255,0.2); border-right: 2px solid rgba(255,255,255,0.2); padding: 0 30px; }
-        .summary-balance-negative { color: #EE3134; }
+    const BLUE = '#303493';
+    const RED = '#EE3134';
+    const pageW = doc.page.width - 80; // usable width
 
-        .section-title {
-          font-size: 13px;
-          font-weight: 700;
-          margin-bottom: 15px;
-          color: #303493;
-          padding-bottom: 10px;
-          border-bottom: 2px solid #303493;
-        }
+    // ---- Header ----
+    doc.fontSize(13).fillColor(BLUE).font('Helvetica-Bold')
+       .text('South Indian Cine, Television Artistes', 40, 40)
+       .text('and Dubbing Artistes Union', 40, 56);
+    doc.fontSize(8).fillColor('#555').font('Helvetica')
+       .text('ESTD: 1983  |  Regd No. 1337/MDS  |  Affiliated with FEFSI', 40, 74)
+       .text('10, Vijayaraghavapuram 4th Street, Saligamam, Chennai-600093', 40, 86)
+       .text('044-23650223 / 23650225 / 23650229  |  sictadau@gmail.com', 40, 98);
 
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 12px;
-          margin-bottom: 20px;
-        }
-        thead tr { background: #303493; color: white; }
-        th {
-          padding: 12px;
-          text-align: left;
-          font-weight: 700;
-          border: none;
-        }
-        td {
-          padding: 12px;
-          border: none;
-          border-bottom: 1px solid #e0e0e0;
-          color: #000000;
-        }
-        tbody tr:nth-child(odd) { background: #f9f9f9; }
-        tbody tr:nth-child(even) { background: #fff; }
-        td strong { color: #000000; }
-        .total-cell { text-align: right; color: #303493; font-weight: 700; }
-        .total-row {
-          text-align: right;
-          margin-top: 15px;
-          padding-top: 15px;
-          border-top: 2px solid #303493;
-          font-size: 13px;
-        }
-        .total-row strong { color: #000000; }
-        .total-amount {
-          display: inline-block;
-          width: 200px;
-          text-align: right;
-          color: #303493;
-          font-weight: 700;
-          font-size: 15px;
-        }
+    // Invoice info (right side)
+    doc.fontSize(10).fillColor('#000').font('Helvetica-Bold')
+       .text(`Invoice No: ${project.id}`, 400, 40, { align: 'right', width: 155 });
+    doc.fontSize(9).fillColor(project.status === 'Paid' ? BLUE : RED).font('Helvetica-Bold')
+       .text(`Status: ${project.status}`, 400, 56, { align: 'right', width: 155 });
+    doc.fontSize(8).fillColor('#555').font('Helvetica')
+       .text(`Start: ${project.start_date || '—'}`, 400, 72, { align: 'right', width: 155 })
+       .text(`End:   ${project.end_date || '—'}`, 400, 84, { align: 'right', width: 155 });
 
-        .bank-details {
-          margin-bottom: 35px;
-          padding: 18px;
-          background: #f5f7ff;
-          border-left: 4px solid #303493;
-          border-radius: 4px;
-          font-size: 12px;
-        }
-        .bank-details div { margin-bottom: 6px; color: #000000; }
-        .bank-details div:last-child { margin-bottom: 0; }
-        .bank-details strong { font-weight: 600; }
+    // Divider
+    doc.moveTo(40, 116).lineTo(555, 116).strokeColor(BLUE).lineWidth(2).stroke();
+    let y = 126;
 
-        .payment-history-total {
-          background: #303493;
-          color: white;
-          font-weight: 700;
-        }
-        .payment-history-total td { color: white; border: none; }
+    // ---- From / To ----
+    doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('FROM:', 40, y).text('TO:', 300, y);
+    y += 14;
+    doc.fontSize(9).fillColor('#000').font('Helvetica-Bold')
+       .text('SICTADAU', 40, y)
+       .text(project.production_company, 300, y);
+    y += 13;
+    doc.fontSize(8).fillColor('#333').font('Helvetica')
+       .text('Chennai-600093', 40, y)
+       .text(`Film: ${project.film_name}`, 300, y);
+    y += 11;
+    doc.text('', 40, y)
+       .text(`Language: ${project.language || '—'}`, 300, y);
+    y += 11;
+    doc.text('', 40, y)
+       .text(`POD: ${project.place_of_dubbing || '—'}`, 300, y);
+    y += 11;
+    doc.text('', 40, y)
+       .text(`Contact: ${project.production_contact_no || '—'}`, 300, y);
+    y += 11;
+    doc.text('', 40, y)
+       .text(`Representative: ${project.rep_name || '—'}`, 300, y);
+    y += 18;
 
-        .divider { border-top: 2px solid #303493; margin-bottom: 30px; padding-top: 30px; }
-
-        .signature {
-          display: flex;
-          justify-content: space-around;
-          margin-bottom: 20px;
-          font-size: 12px;
-          text-align: center;
-        }
-        .sig-space { height: 45px; margin-bottom: 12px; }
-        .sig-line { border-top: 2px solid #000000; padding-top: 8px; color: #000000; font-weight: 600; }
-
-        .footer { font-size: 11px; color: #999; text-align: center; margin-top: 20px; font-style: italic; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="header-left">
-          <div class="header-item">Project Entry Date : <strong>${project.start_date}</strong></div>
-          <div class="header-item">Project End Date : <strong>${project.end_date}</strong></div>
-        </div>
-        <div class="header-right">
-          <div class="header-item">Invoice No. : <strong class="invoice-no">${project.id}</strong></div>
-          <div class="header-item">Status : <strong><span class="status ${project.status === 'Paid' ? 'paid' : 'pending'}">${project.status}</span></strong></div>
-        </div>
-      </div>
-
-      <div class="from-to">
-        <div class="from-section">
-          <div class="section-label">From:</div>
-          <div class="section-content">
-            <strong>South Indian Cine, Television Artistes and Dubbing Artistes Union</strong>
-            <span>ESTD : 1983 - Regd No. 1337/MDS</span>
-            <span>Affiliated with FEFSI</span>
-            <span>10, Vijayaraghavapuram 4th Street, Saligamam, Chennai-600093</span>
-            <span>044-23650223, 23650225, 23650229</span>
-            <span style="color: #303493; font-weight: 500;">sictadau@gmail.com</span>
-          </div>
-        </div>
-        <div class="to-section">
-          <div class="section-label">To:</div>
-          <div class="section-content">
-            <strong>${project.production_company}</strong>
-            <span>Project Name : <strong>${project.film_name}</strong></span>
-            <span>Project Language : <strong>${project.language || '—'}</strong></span>
-            <span>POD : <strong>${project.place_of_dubbing || '—'}</strong></span>
-            <span>Contact : ${project.production_contact_no || '—'}</span>
-            <span>Representative: <strong>${project.rep_name || '—'}</strong></span>
-          </div>
-        </div>
-      </div>
-
-      <div class="summary">
-        <div class="summary-item">
-          <div class="summary-label">TOTAL AMOUNT</div>
-          <div class="summary-value">₹${(project.amount||0).toLocaleString('en-IN')}</div>
-        </div>
-        <div class="summary-item">
-          <div class="summary-label">AMOUNT RECEIVED</div>
-          <div class="summary-value">₹${(project.payment_received||0).toLocaleString('en-IN')}</div>
-        </div>
-        <div class="summary-item">
-          <div class="summary-label">BALANCE</div>
-          <div class="summary-value ${((project.amount||0) - (project.payment_received||0)) > 0 ? 'summary-balance-negative' : ''}">₹${((project.amount||0) - (project.payment_received||0)).toLocaleString('en-IN')}</div>
-        </div>
-        <div class="summary-item">
-          <div class="summary-label">TOTAL ARTISTS</div>
-          <div class="summary-value">${vouchers.length}</div>
-        </div>
-      </div>
-
-      <div style="margin-bottom: 35px;">
-        <div class="section-title">Artist Vouchers (${vouchers.length})</div>
-        ${vouchers.length === 0 ?
-          '<div style="padding: 30px; text-align: center; color: #999; font-size: 13px;">No vouchers added yet</div>' :
-          `<table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Mem No.</th>
-                <th>Dubbing Artist Name</th>
-                <th>Character</th>
-                <th style="text-align: right;">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${vouchers.map(v => `
-              <tr>
-                <td>${v.id}</td>
-                <td>${v.membership_no}</td>
-                <td><strong>${v.full_name}</strong></td>
-                <td>${v.character || '—'}</td>
-                <td class="total-cell">Rs. ${(v.amount||0).toLocaleString('en-IN')}</td>
-              </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="total-row">
-            <div style="font-size: 13px;">
-              <strong>Total</strong>
-              <span class="total-amount">Rs. ${vouchers.reduce((s,v)=>s+(v.amount||0),0).toLocaleString('en-IN')}</span>
-            </div>
-          </div>`
-        }
-      </div>
-
-      <div class="bank-details">
-        <div><strong>A/C Name :</strong> South Indian Cine, Television Artistes and Dubbing Artistes Union</div>
-        <div><strong>A/C NO. :</strong> 1616135000004793</div>
-        <div><strong>IFSC CODE :</strong> KVBL0001616</div>
-        <div><strong>BANK :</strong> KARUR VYSYA BANK, K.K.Nagar Branch</div>
-        <div><strong>PAN NO. :</strong> AADAS9061M</div>
-      </div>
-
-      ${payments.length > 0 ? `
-      <div style="margin-bottom: 35px;">
-        <div class="section-title">Payment History</div>
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th style="width: 15%;">Transaction Date</th>
-              <th>Payment Type</th>
-              <th>Notes</th>
-              <th style="text-align: right;">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${payments.map(p => `
-            <tr>
-              <td>${p.id}</td>
-              <td>${p.transaction_date}</td>
-              <td><strong>${p.payment_type}</strong></td>
-              <td>${p.notes || '—'}</td>
-              <td class="total-cell">Rs. ${p.amount.toLocaleString('en-IN')}</td>
-            </tr>
-            `).join('')}
-            <tr class="payment-history-total">
-              <td colspan="4" style="text-align: right;">Total Amount Received</td>
-              <td style="text-align: right;">Rs. ${totalPaid.toLocaleString('en-IN')}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      ` : ''}
-
-      <div class="divider"></div>
-
-      <div class="signature">
-        <div>
-          <div class="sig-space"></div>
-          <div class="sig-line">Co-ordinator<br>Mr.C.D.Ananthraman</div>
-        </div>
-        <div>
-          <div class="sig-space"></div>
-          <div class="sig-line">Manager / Secretary<br>Treasurer</div>
-        </div>
-        <div>
-          <div class="sig-space"></div>
-          <div class="sig-line">For ${project.production_company}</div>
-        </div>
-      </div>
-      <div class="footer">*Cheque subject to realisation</div>
-    </body>
-    </html>
-    `;
-
-    // PDF options
-    const options = {
-      format: 'A4',
-      margin: '10mm',
-      footer: { height: '10mm' }
-    };
-
-    // Generate PDF
-    pdf.create(htmlContent, options).toBuffer((err, buffer) => {
-      if (err) {
-        console.error('PDF generation error:', err);
-        req.flash('error', 'Failed to generate PDF.');
-        return res.redirect(`/projects/${project.id}`);
-      }
-
-      // Send PDF to browser
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="Invoice-${project.id}-${project.film_name}.pdf"`);
-      res.send(buffer);
+    // ---- Summary boxes ----
+    const boxW = pageW / 4;
+    const boxes = [
+      { label: 'TOTAL AMOUNT', value: `Rs.${(project.amount||0).toLocaleString('en-IN')}` },
+      { label: 'AMOUNT RECEIVED', value: `Rs.${(project.payment_received||0).toLocaleString('en-IN')}` },
+      { label: 'BALANCE', value: `Rs.${balance.toLocaleString('en-IN')}`, red: balance > 0 },
+      { label: 'TOTAL ARTISTS', value: `${vouchers.length}` },
+    ];
+    boxes.forEach((b, i) => {
+      const bx = 40 + i * (boxW + 2);
+      doc.rect(bx, y, boxW, 36).fillColor(BLUE).fill();
+      doc.fontSize(7).fillColor('#ccc').font('Helvetica').text(b.label, bx + 4, y + 5, { width: boxW - 8, align: 'center' });
+      doc.fontSize(11).fillColor(b.red ? RED : '#fff').font('Helvetica-Bold')
+         .text(b.value, bx + 4, y + 17, { width: boxW - 8, align: 'center' });
     });
+    y += 46;
+
+    // ---- Artist Vouchers table ----
+    doc.moveTo(40, y).lineTo(555, y).strokeColor(BLUE).lineWidth(1).stroke();
+    y += 6;
+    doc.fontSize(9).fillColor(BLUE).font('Helvetica-Bold').text(`Artist Vouchers (${vouchers.length})`, 40, y);
+    y += 14;
+
+    // Table header
+    const cols = [40, 80, 150, 330, 430];
+    const colW = [38, 68, 178, 98, 80];
+    const headers = ['ID', 'Mem No.', 'Artist Name', 'Character', 'Amount'];
+    doc.rect(40, y, pageW, 16).fillColor(BLUE).fill();
+    headers.forEach((h, i) => {
+      doc.fontSize(8).fillColor('#fff').font('Helvetica-Bold')
+         .text(h, cols[i] + 2, y + 3, { width: colW[i] - 4, align: i === 4 ? 'right' : 'left' });
+    });
+    y += 16;
+
+    if (vouchers.length === 0) {
+      doc.fontSize(8).fillColor('#999').font('Helvetica').text('No vouchers added yet', 40, y + 4, { align: 'center', width: pageW });
+      y += 18;
+    } else {
+      vouchers.forEach((v, idx) => {
+        if (y > 720) { doc.addPage(); y = 40; }
+        if (idx % 2 === 0) { doc.rect(40, y, pageW, 14).fillColor('#f5f5f5').fill(); }
+        doc.fontSize(7.5).fillColor('#000').font('Helvetica')
+           .text(String(v.id), cols[0] + 2, y + 2, { width: colW[0] - 4 })
+           .text(v.membership_no || '', cols[1] + 2, y + 2, { width: colW[1] - 4 })
+           .text(v.full_name || '', cols[2] + 2, y + 2, { width: colW[2] - 4 })
+           .text(v.character || '—', cols[3] + 2, y + 2, { width: colW[3] - 4 })
+           .text(`Rs.${(v.amount||0).toLocaleString('en-IN')}`, cols[4] + 2, y + 2, { width: colW[4] - 4, align: 'right' });
+        y += 14;
+      });
+      // Total row
+      const vTotal = vouchers.reduce((s, v) => s + (v.amount || 0), 0);
+      doc.rect(40, y, pageW, 14).fillColor('#e8e9f8').fill();
+      doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold')
+         .text('Total', 40, y + 2, { width: pageW - 84, align: 'right' })
+         .text(`Rs.${vTotal.toLocaleString('en-IN')}`, cols[4] + 2, y + 2, { width: colW[4] - 4, align: 'right' });
+      y += 20;
+    }
+
+    // ---- Bank details ----
+    if (y > 680) { doc.addPage(); y = 40; }
+    doc.rect(40, y, pageW, 58).fillColor('#f5f7ff').fill();
+    doc.moveTo(40, y).lineTo(40, y + 58).strokeColor(BLUE).lineWidth(3).stroke();
+    y += 6;
+    doc.fontSize(7.5).fillColor('#000').font('Helvetica');
+    const bankLines = [
+      'A/C Name : South Indian Cine, Television Artistes and Dubbing Artistes Union',
+      'A/C NO.  : 1616135000004793        IFSC CODE : KVBL0001616',
+      'BANK     : KARUR VYSYA BANK, K.K.Nagar Branch',
+      'PAN NO.  : AADAS9061M',
+    ];
+    bankLines.forEach(line => { doc.text(line, 50, y, { width: pageW - 14 }); y += 11; });
+    y += 10;
+
+    // ---- Payment history ----
+    if (payments.length > 0) {
+      if (y > 680) { doc.addPage(); y = 40; }
+      doc.moveTo(40, y).lineTo(555, y).strokeColor(BLUE).lineWidth(1).stroke();
+      y += 6;
+      doc.fontSize(9).fillColor(BLUE).font('Helvetica-Bold').text('Payment History', 40, y);
+      y += 14;
+
+      const pCols = [40, 90, 190, 290, 400];
+      const pColW = [48, 98, 98, 108, 115];
+      const pHeaders = ['ID', 'Date', 'Type', 'Notes', 'Amount'];
+      doc.rect(40, y, pageW, 16).fillColor(BLUE).fill();
+      pHeaders.forEach((h, i) => {
+        doc.fontSize(8).fillColor('#fff').font('Helvetica-Bold')
+           .text(h, pCols[i] + 2, y + 3, { width: pColW[i] - 4, align: i === 4 ? 'right' : 'left' });
+      });
+      y += 16;
+
+      payments.forEach((p, idx) => {
+        if (y > 720) { doc.addPage(); y = 40; }
+        if (idx % 2 === 0) { doc.rect(40, y, pageW, 14).fillColor('#f5f5f5').fill(); }
+        doc.fontSize(7.5).fillColor('#000').font('Helvetica')
+           .text(String(p.id), pCols[0] + 2, y + 2, { width: pColW[0] - 4 })
+           .text(p.transaction_date || '', pCols[1] + 2, y + 2, { width: pColW[1] - 4 })
+           .text(p.payment_type || '', pCols[2] + 2, y + 2, { width: pColW[2] - 4 })
+           .text(p.notes || '—', pCols[3] + 2, y + 2, { width: pColW[3] - 4 })
+           .text(`Rs.${p.amount.toLocaleString('en-IN')}`, pCols[4] + 2, y + 2, { width: pColW[4] - 4, align: 'right' });
+        y += 14;
+      });
+      doc.rect(40, y, pageW, 14).fillColor(BLUE).fill();
+      doc.fontSize(8).fillColor('#fff').font('Helvetica-Bold')
+         .text('Total Amount Received', 40, y + 2, { width: pageW - 84, align: 'right' })
+         .text(`Rs.${totalPaid.toLocaleString('en-IN')}`, pCols[4] + 2, y + 2, { width: pColW[4] - 4, align: 'right' });
+      y += 20;
+    }
+
+    // ---- Signatures ----
+    if (y > 680) { doc.addPage(); y = 40; }
+    y += 10;
+    doc.moveTo(40, y).lineTo(555, y).strokeColor(BLUE).lineWidth(1).stroke();
+    y += 30;
+    const sigX = [60, 220, 390];
+    const sigLabels = ['Co-ordinator\nMr.C.D.Ananthraman', 'Manager / Secretary\nTreasurer', `For\n${project.production_company}`];
+    sigLabels.forEach((label, i) => {
+      doc.moveTo(sigX[i], y).lineTo(sigX[i] + 120, y).strokeColor('#000').lineWidth(1).stroke();
+      doc.fontSize(7.5).fillColor('#000').font('Helvetica').text(label, sigX[i], y + 4, { width: 120, align: 'center' });
+    });
+    y += 30;
+    doc.fontSize(7).fillColor('#999').font('Helvetica-Oblique')
+       .text('*Cheque subject to realisation', 40, y, { align: 'center', width: pageW });
+
+    doc.end();
   } catch (err) {
     console.error('Download invoice error:', err);
     req.flash('error', 'Error generating invoice.');
