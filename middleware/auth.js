@@ -41,10 +41,10 @@ function redirectIfAuth(req, res, next) {
 
 // Attach user to res.locals for all views
 function attachUser(req, res, next) {
-  res.locals.currentUser = req.session
+  res.locals.currentUser = (req.session && req.session.userId)
     ? {
         id: req.session.userId,
-        name: req.session.userName,
+        name: req.session.userName || 'User',
         email: req.session.userEmail,
         role: req.session.userRole
       }
