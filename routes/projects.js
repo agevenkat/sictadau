@@ -6,14 +6,16 @@ const router = express.Router();
 const projectController = require('../controllers/projectController');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
-// Ensure uploads directory exists
-const uploadsDir = './public/uploads';
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// On Vercel only /tmp is writable; locally use public/uploads (served as static)
+const IS_VERCEL = process.env.VERCEL === '1';
+const UPLOADS_DIR = IS_VERCEL ? '/tmp/uploads' : path.join(__dirname, '../public/uploads');
+try { if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (_) {}
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
+  destination: (req, file, cb) => {
+    try { if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (_) {}
+    cb(null, UPLOADS_DIR);
+  },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
     cb(null, `project_${Date.now()}_${file.fieldname}${ext}`);
@@ -29,31 +31,26 @@ const upload = multer({
   }
 });
 
-const fields = upload.fields([
-  { name: 'representative_form', maxCount: 1 },
-  { name: 'working_report_file', maxCount: 1 }
-]);
-
-// Multer error handler middleware
-const handleMulterError = (err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
-    if (err.code === 'FILE_TOO_LARGE') {
-      req.flash('error', 'File size exceeds 10MB limit.');
-    } else if (err.code === 'LIMIT_FILE_COUNT') {
-      req.flash('error', 'Too many files uploaded.');
-    } else {
-      req.flash('error', `Upload error: ${err.message}`);
+// Wrap upload.fields() so multer errors flash and redirect instead of crashing
+const uploadFields = (req, res, next) => {
+  upload.fields([
+    { name: 'representative_form', maxCount: 1 },
+    { name: 'working_report_file', maxCount: 1 }
+  ])(req, res, (err) => {
+    if (!err) return next();
+    let msg = 'File upload failed.';
+    if (err instanceof multer.MulterError) {
+      msg = err.code === 'FILE_TOO_LARGE' ? 'File too large (max 10MB).'
+          : err.code === 'LIMIT_FILE_COUNT' ? 'Too many files.'
+          : `Upload error: ${err.message}`;
+    } else if (err && err.message) {
+      msg = err.message;
     }
-  } else if (err) {
-    req.flash('error', err.message || 'File upload failed.');
-  }
-
-  if (req.baseUrl.includes('create') && req.method === 'POST') {
+    req.flash('error', msg);
+    // Redirect back to the originating form
+    if (req.params.id) return res.redirect(`/projects/${req.params.id}/edit`);
     return res.redirect('/projects/create');
-  } else if (req.params.id && req.method === 'PUT') {
-    return res.redirect(`/projects/${req.params.id}/edit`);
-  }
-  next(err);
+  });
 };
 
 router.use(requireAuth);
@@ -64,12 +61,12 @@ router.get('/representatives', requireAdmin, projectController.repsIndex);
 router.post('/representatives', requireAdmin, projectController.repCreate);
 router.delete('/representatives/:id', requireAdmin, projectController.repDestroy);
 router.get('/create', projectController.showCreate);
-router.post('/', fields, handleMulterError, projectController.create);
+router.post('/', uploadFields, projectController.create);
 router.get('/:id/invoice', projectController.invoice);
 router.get('/:id/download-invoice', projectController.downloadInvoice);
 router.get('/:id', projectController.show);
 router.get('/:id/edit', projectController.showEdit);
-router.put('/:id', fields, handleMulterError, projectController.update);
+router.put('/:id', uploadFields, projectController.update);
 router.delete('/:id', requireAdmin, projectController.destroy);
 router.post('/:id/payments', projectController.addPayment);
 

@@ -63,6 +63,16 @@ app.set('layout extractScripts', true);
 app.set('layout extractStyles', true);
 
 // ---- Static files ----
+// On Vercel, /public/uploads is read-only; uploaded files are stored in /tmp/uploads
+// and served here before the static middleware picks up anything else under /uploads.
+if (IS_VERCEL) {
+  const fsSync = require('fs');
+  app.use('/uploads', (req, res) => {
+    const filePath = path.join('/tmp/uploads', path.basename(req.path));
+    if (fsSync.existsSync(filePath)) return res.sendFile(filePath);
+    res.status(404).end();
+  });
+}
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---- Body parsers ----

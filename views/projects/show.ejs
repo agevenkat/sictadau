@@ -401,7 +401,7 @@
           <div class="mb-3">
             <label class="form-label fw-medium">Transaction Date <span class="text-danger">*</span></label>
             <input type="date" name="transaction_date" class="form-control"
-              value="<%= new Date().toISOString().slice(0,10) %>" required>
+              value="<%= new Date().toLocaleDateString('sv', { timeZone: 'Asia/Kolkata' }) %>" required>
           </div>
           <div class="mb-3">
             <label class="form-label fw-medium">Payment Type <span class="text-danger">*</span></label>
