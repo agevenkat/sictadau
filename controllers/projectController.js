@@ -451,9 +451,11 @@ exports.addPayment = async (req, res) => {
   const amt = parseFloat(amount) || 0;
   if (amt <= 0) { req.flash('error', 'Invalid amount.'); return res.redirect(`/projects/${project.id}`); }
 
+  // Save to project_payments
   await db.prepare('INSERT INTO project_payments (project_id, transaction_date, payment_type, notes, amount) VALUES (?,?,?,?,?)')
     .run(project.id, transaction_date, payment_type, notes, amt);
 
+  // Keep payment_received in sync
   const row = await db.prepare('SELECT SUM(amount) as total FROM project_payments WHERE project_id = ?').get(project.id);
   const totalPaid = row.total || 0;
   await db.prepare('UPDATE projects SET payment_received = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(totalPaid, project.id);
@@ -462,7 +464,16 @@ exports.addPayment = async (req, res) => {
     await db.prepare("UPDATE projects SET status='Paid', updated_at=CURRENT_TIMESTAMP WHERE id=?").run(project.id);
   }
 
-  req.flash('success', 'Payment recorded.');
+  // ── Record a Credit entry in the Statement ledger ──────────────────────────
+  // This is the union's INCOME side — money received from the production company.
+  const remarks = [project.film_name, project.production_company]
+    .filter(Boolean).join(' — ') + (notes ? ` | ${notes}` : '');
+  await db.prepare(`INSERT INTO statements
+    (transaction_date, income_type, paid_to, project_id, payment_mode, transaction_remarks, amount_type, amount)
+    VALUES (?, 'Working Report Payment', NULL, ?, ?, ?, 'Credit', ?)`)
+    .run(transaction_date, project.id, payment_type || 'Others', remarks, amt);
+
+  req.flash('success', 'Payment recorded and posted to Statement ledger.');
   res.redirect(`/projects/${project.id}`);
 };
 

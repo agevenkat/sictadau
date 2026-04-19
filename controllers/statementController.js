@@ -2,8 +2,9 @@ const db = require('../database/db');
 const path = require('path');
 const fs = require('fs');
 
-const INCOME_TYPES = ['Artist Payment', 'GW Fund', 'Representative Commission', 'Office Maintenance',
-  'Tea, Coffee, Water', 'Transportation', 'Pooja Expenses', 'Salary', 'Membership Fee', 'Other'];
+const INCOME_TYPES = ['Working Report Payment', 'Artist Payment', 'GW Fund', 'Representative Commission',
+  'Office Maintenance', 'Tea, Coffee, Water', 'Transportation', 'Pooja Expenses', 'Salary',
+  'Membership Fee', 'Other'];
 const PAYMENT_MODES = ['Cash', 'NEFT', 'Cheque', 'Others'];
 
 exports.index = async (req, res) => {

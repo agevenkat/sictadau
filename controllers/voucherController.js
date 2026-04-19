@@ -331,9 +331,12 @@ exports.markPaid = async (req, res) => {
 
   const member = await db.prepare('SELECT full_name FROM members WHERE id = ?').get(voucher.member_id);
   const project = await db.prepare('SELECT film_name FROM projects WHERE id = ?').get(voucher.project_id);
+  // Use IST date for transaction_date (date('now') is UTC and can be a day behind in +05:30)
+  const istDate = new Date().toLocaleDateString('sv', { timeZone: 'Asia/Kolkata' }); // 'sv' locale gives YYYY-MM-DD
   await db.prepare(`INSERT INTO statements (transaction_date, income_type, paid_to, project_id, payment_mode, transaction_remarks, amount_type, amount)
-    VALUES (date('now'), 'Artist Payment', ?, ?, ?, ?, 'Debit', ?)`
-  ).run(
+    VALUES (?, 'Artist Payment', ?, ?, ?, ?, 'Debit', ?)`)
+  .run(
+    istDate,
     member?.full_name, voucher.project_id,
     payment_method || 'Others',
     `Voucher #${voucher.id} — ${project?.film_name}`,
