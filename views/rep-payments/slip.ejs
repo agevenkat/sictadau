@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rep Voucher #<%= payment.id %></title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+      font-size: 13px; color: #000; margin: 0; padding: 20px;
+    }
+    .wrap { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 4px; }
+
+    .btn-row { display: flex; gap: 8px; margin-bottom: 15px; }
+    .btn { padding: 8px 14px; border: none; border-radius: 4px; font-size: 13px; font-weight: 600;
+           cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+    .btn-blue  { background: #303493; color: #fff; }
+    .btn-muted { background: #f0f0f0; color: #333; }
+    .btn-green { background: #16a34a; color: #fff; }
+
+    .meta-bar { border: 1px solid #ccc; padding: 8px 14px; margin-bottom: 15px; font-size: 12px;
+                display: flex; justify-content: space-between; align-items: center; }
+
+    .from-to { width: 100%; border: 1px solid #ccc; border-collapse: collapse; margin-bottom: 15px; }
+    .from-to td { padding: 12px; vertical-align: top; width: 50%; }
+    .from-to td:first-child { border-right: 1px solid #ccc; }
+    .logo { width: 72px; height: 72px; object-fit: contain; float: left; margin-right: 10px; }
+
+    table.dt { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px; }
+    table.dt th, table.dt td { border: 1px solid #999; padding: 7px 10px; }
+    table.dt th { background: #303493; color: #fff; font-weight: 600; border-color: #303493; }
+    table.dt tbody tr:nth-child(even) td { background: #f9f9f9; }
+    table.dt tfoot td { background: #e8e9f8; font-weight: 700; color: #303493; }
+
+    .totals { border: 1px solid #ccc; border-radius: 3px; overflow: hidden;
+              max-width: 280px; margin-left: auto; margin-bottom: 24px; font-size: 13px; }
+    .tot-row { display: flex; justify-content: space-between; padding: 7px 14px; border-bottom: 1px solid #eee; }
+    .tot-row:last-child { border: none; background: #303493; color: #fff; font-weight: 700; }
+
+    .sigs { display: flex; justify-content: space-around; margin-top: 48px; font-size: 12px; text-align: center; }
+    .sig-line { border-top: 2px solid #333; padding-top: 7px; font-weight: 600; line-height: 1.6; margin-top: 36px; }
+
+    /* Pay modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 9999;
+                     align-items: center; justify-content: center; }
+    .modal-overlay.show { display: flex; }
+    .modal-box { background: #fff; border-radius: 6px; width: 90%; max-width: 460px;
+                 box-shadow: 0 8px 32px rgba(0,0,0,.2); overflow: hidden; }
+    .modal-head { background: #303493; color: #fff; padding: 16px 20px;
+                  display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 20px; }
+    .modal-body label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 12px; }
+    .modal-body select, .modal-body input, .modal-body textarea {
+      width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px;
+      font-size: 13px; font-family: inherit; margin-bottom: 12px; }
+    .modal-foot { background: #f9f9f9; border-top: 1px solid #eee; padding: 12px 20px;
+                  display: flex; justify-content: flex-end; gap: 8px; }
+
+    @media print {
+      .no-print { display: none !important; }
+      body { padding: 0; background: #fff; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <%
+    const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function fmtD(d) {
+      if (!d) return '—';
+      const m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/);
+      return m ? `${m[3]}-${MON[parseInt(m[2],10)-1]}-${m[1]}` : String(d);
+    }
+  %>
+
+  <!-- Action buttons -->
+  <div class="btn-row no-print">
+    <button onclick="window.print()" class="btn btn-blue"><i class="bi bi-printer"></i>Print</button>
+    <% if (payment.status === 'Pending') { %>
+    <button onclick="document.getElementById('payModal').classList.add('show')" class="btn btn-green">
+      <i class="bi bi-cash-coin"></i>Mark as Paid
+    </button>
+    <% } %>
+    <a href="/rep-payments" class="btn btn-muted"><i class="bi bi-arrow-left"></i>Back</a>
+  </div>
+
+  <!-- Meta bar -->
+  <div class="meta-bar">
+    <div>
+      Rep Voucher No. <strong>#<%= payment.id %></strong>
+      <% if (payment.paid_on) {
+           const _d = new Date(String(payment.paid_on).replace(' ','T')+'Z');
+           const _fmt = _d.toLocaleString('en-IN', { timeZone:'Asia/Kolkata', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true });
+      %> &nbsp;&mdash; Paid on: <strong><%= _fmt %></strong><% } %>
+    </div>
+    <div>
+      Status: <strong style="color:<%= payment.status==='Paid'?'#16a34a':'#d97706' %>"><%= payment.status %></strong>
+      <% if (payment.status === 'Paid') { %>
+        &nbsp;via <strong><%= payment.payment_method %></strong>
+        <% if (payment.notes) { %>&mdash; <%= payment.notes %><% } %>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- From / To -->
+  <table class="from-to">
+    <tr>
+      <td>
+        <img src="/images/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
+        <div><strong>From:</strong></div>
+        <div><strong>South Indian Cine, Television Artistes and Dubbing Artistes Union</strong></div>
+        <div>ESTD : <strong>1983</strong> &mdash; Regd No. <strong>1337/MDS</strong> &mdash; Affiliated with FEFSI</div>
+        <div>10, Vijayaraghavapuram 4th Street, Saligamam, Chennai-600093</div>
+        <div>044-23650223, 23650225, 23650229 &bull; sictadau@gmail.com</div>
+      </td>
+      <td>
+        <div><strong>To (Representative):</strong></div>
+        <div style="font-size:15px;font-weight:700;margin:4px 0;"><%= payment.rep_name %></div>
+        <% if (payment.contact) { %><div><i class="bi bi-telephone me-1"></i><%= payment.contact %></div><% } %>
+        <% if (payment.email) { %><div><i class="bi bi-envelope me-1"></i><%= payment.email %></div><% } %>
+        <div style="margin-top:10px;">
+          <div><strong>Film:</strong> <%= payment.film_name %>
+            <% if (payment.language) { %> (<%= payment.language %>)<% } %>
+          </div>
+          <div><strong>Company:</strong> <%= payment.production_company %></div>
+          <% if (payment.place_of_dubbing) { %><div><strong>POD:</strong> <%= payment.place_of_dubbing %></div><% } %>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Artist vouchers breakdown -->
+  <div style="font-size:13px;font-weight:700;color:#303493;border-bottom:2px solid #303493;padding-bottom:6px;margin-bottom:12px;">
+    Artist Vouchers Covered (<%= vouchers.length %>)
+  </div>
+  <table class="dt">
+    <thead>
+      <tr>
+        <th>Voucher #</th>
+        <th>Mem No.</th>
+        <th>Artist Name</th>
+        <th>Character</th>
+        <th style="text-align:right;">Gross Amount</th>
+        <th style="text-align:center;">Rep %</th>
+        <th style="text-align:right;">Commission</th>
+        <th style="text-align:center;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% vouchers.forEach(v => { %>
+      <tr>
+        <td>#<%= v.id %></td>
+        <td><%= v.membership_no %></td>
+        <td style="font-weight:500;"><%= v.full_name %></td>
+        <td><%= v.character || '—' %></td>
+        <td style="text-align:right;">Rs. <%= (v.amount||0).toLocaleString('en-IN') %></td>
+        <td style="text-align:center;"><%= v.representative_percent %>%</td>
+        <td style="text-align:right;font-weight:700;color:#303493;">Rs. <%= (v.representative_amount||0).toLocaleString('en-IN') %></td>
+        <td style="text-align:center;">
+          <span style="background:<%= v.status==='Paid'?'#dcfce7':'#fef3c7' %>;color:<%= v.status==='Paid'?'#15803d':'#92400e' %>;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">
+            <%= v.status %>
+          </span>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4" style="text-align:right;">Total</td>
+        <td style="text-align:right;">Rs. <%= vouchers.reduce((s,v)=>s+(v.amount||0),0).toLocaleString('en-IN') %></td>
+        <td></td>
+        <td style="text-align:right;color:#303493;">Rs. <%= vouchers.reduce((s,v)=>s+(v.representative_amount||0),0).toLocaleString('en-IN') %></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- Commission total box -->
+  <div class="totals">
+    <div class="tot-row"><span>Total Gross (Artists)</span><span>Rs. <%= vouchers.reduce((s,v)=>s+(v.amount||0),0).toLocaleString('en-IN') %></span></div>
+    <div class="tot-row"><span>Total Commission Due</span><span style="color:#303493;font-weight:700;">Rs. <%= (payment.amount||0).toLocaleString('en-IN') %></span></div>
+    <div class="tot-row"><span>Amount Payable</span><span>Rs. <%= (payment.amount||0).toLocaleString('en-IN') %></span></div>
+  </div>
+
+  <!-- Signatures -->
+  <div style="border-top:2px solid #303493;padding-top:28px;"></div>
+  <div class="sigs">
+    <div><div class="sig-line">Co-ordinator<br>Mr. C.D.Ananthraman</div></div>
+    <div><div class="sig-line">Manager / Secretary<br>Treasurer</div></div>
+    <div><div class="sig-line">Representative<br><%= payment.rep_name %></div></div>
+  </div>
+  <div style="text-align:center;font-size:11px;color:#aaa;font-style:italic;margin-top:18px;">
+    *Cheque subject to realisation
+  </div>
+
+</div><!-- /wrap -->
+
+<!-- Pay modal -->
+<% if (payment.status === 'Pending') { %>
+<div class="modal-overlay no-print" id="payModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span style="font-weight:700;">Mark Commission as Paid</span>
+      <button onclick="document.getElementById('payModal').classList.remove('show')"
+              style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">&times;</button>
+    </div>
+    <form action="/rep-payments/<%= payment.id %>/pay" method="POST">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="modal-body">
+        <label>Amount</label>
+        <input type="text" value="₹<%= (payment.amount||0).toLocaleString('en-IN') %>" disabled>
+
+        <label>Payment Method <span style="color:red;">*</span></label>
+        <select name="payment_method" required>
+          <option value="">— Select —</option>
+          <option value="Cash">Cash</option>
+          <option value="Cheque">Cheque</option>
+          <option value="NEFT">NEFT</option>
+          <option value="RTGS">RTGS</option>
+          <option value="Others">Others</option>
+        </select>
+
+        <label>Notes / Reference</label>
+        <textarea name="notes" rows="2" placeholder="Cheque no., UTR, remarks…"></textarea>
+      </div>
+      <div class="modal-foot">
+        <button type="button" onclick="document.getElementById('payModal').classList.remove('show')"
+                class="btn btn-muted">Cancel</button>
+        <button type="submit" class="btn btn-green"><i class="bi bi-check-lg"></i>Confirm Payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  document.getElementById('payModal')?.addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('show');
+  });
+</script>
+</body>
+</html>

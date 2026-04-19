@@ -1,0 +1,154 @@
+<% activePage = 'rep-payments'; %>
+
+<!-- KPI row -->
+<%
+  const totalEarned  = kpi.total_earned  || 0;
+  const totalPaid    = kpi.total_paid    || 0;
+  const totalPending = kpi.total_pending || 0;
+  const totalUnvouchered = totalEarned - totalPaid - totalPending;
+%>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="fw-bold mb-0">Representative Income</h4>
+    <small class="text-muted">Commission earned per working report &mdash; Film only</small>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="fw-bold fs-5 text-primary"><%= kpi.total_reps || 0 %></div>
+      <div class="small text-muted">Representatives</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="fw-bold fs-5 text-dark">₹<%= totalEarned.toLocaleString('en-IN') %></div>
+      <div class="small text-muted">Total Commission Earned</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="fw-bold fs-5 text-success">₹<%= totalPaid.toLocaleString('en-IN') %></div>
+      <div class="small text-muted">Paid Out</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="fw-bold fs-5 text-danger">₹<%= (totalPending + totalUnvouchered).toLocaleString('en-IN') %></div>
+      <div class="small text-muted">Outstanding</div>
+    </div>
+  </div>
+</div>
+
+<% if (rows.length === 0) { %>
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-person-badge d-block mb-2" style="font-size:2.5rem;"></i>
+    No representative commission data found.<br>
+    <small>Commissions appear here once Film vouchers with a representative are created.</small>
+  </div>
+</div>
+<% } else {
+  // Group rows by rep
+  const repMap = {};
+  rows.forEach(r => {
+    if (!repMap[r.rep_id]) repMap[r.rep_id] = { rep_id: r.rep_id, rep_name: r.rep_name, contact: r.contact, projects: [] };
+    repMap[r.rep_id].projects.push(r);
+  });
+  const reps = Object.values(repMap);
+%>
+
+<% reps.forEach(rep => {
+  const repTotal    = rep.projects.reduce((s, p) => s + (p.commission_amount || 0), 0);
+  const repPaid     = rep.projects.filter(p => p.payment_status === 'Paid').reduce((s, p) => s + (p.payment_amount || 0), 0);
+  const repPending  = rep.projects.filter(p => p.payment_status === 'Pending').reduce((s, p) => s + (p.payment_amount || 0), 0);
+%>
+<div class="card border-0 shadow-sm mb-3">
+  <!-- Rep header -->
+  <div class="card-header d-flex justify-content-between align-items-center py-2">
+    <div class="d-flex align-items-center gap-2">
+      <div style="width:34px;height:34px;border-radius:50%;background:#303493;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">
+        <%= rep.rep_name.charAt(0).toUpperCase() %>
+      </div>
+      <div>
+        <div class="fw-bold"><%= rep.rep_name %></div>
+        <% if (rep.contact) { %><small class="text-muted"><i class="bi bi-telephone me-1"></i><%= rep.contact %></small><% } %>
+      </div>
+    </div>
+    <div class="text-end">
+      <div class="small text-muted">Total Earned</div>
+      <div class="fw-bold text-primary">₹<%= repTotal.toLocaleString('en-IN') %></div>
+    </div>
+  </div>
+
+  <!-- Projects table -->
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Film / Project</th>
+          <th>Company</th>
+          <th class="text-center">Vouchers</th>
+          <th class="text-end">Total Gross</th>
+          <th class="text-end">Commission</th>
+          <th class="text-center">Status</th>
+          <th class="text-center">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rep.projects.forEach(proj => { %>
+        <tr>
+          <td class="fw-medium small"><%= proj.film_name %></td>
+          <td class="small text-muted"><%= proj.production_company %></td>
+          <td class="text-center small"><%= proj.voucher_count %></td>
+          <td class="text-end small">₹<%= (proj.total_gross || 0).toLocaleString('en-IN') %></td>
+          <td class="text-end fw-bold small" style="color:#303493;">₹<%= (proj.commission_amount || 0).toLocaleString('en-IN') %></td>
+          <td class="text-center">
+            <% if (!proj.rep_payment_id) { %>
+              <span class="badge bg-secondary" style="font-size:.7rem;">No Voucher</span>
+            <% } else if (proj.payment_status === 'Pending') { %>
+              <span class="badge bg-warning text-dark" style="font-size:.7rem;">Pending</span>
+            <% } else { %>
+              <span class="badge bg-success" style="font-size:.7rem;">Paid</span>
+            <% } %>
+          </td>
+          <td class="text-center">
+            <% if (!proj.rep_payment_id) { %>
+              <!-- Generate voucher -->
+              <form action="/rep-payments" method="POST" class="d-inline">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="rep_id"     value="<%= proj.rep_id %>">
+                <input type="hidden" name="project_id" value="<%= proj.project_id %>">
+                <button type="submit" class="btn btn-xs btn-outline-primary" style="font-size:.72rem;padding:2px 8px;"
+                  title="Generate commission voucher for ₹<%= (proj.commission_amount||0).toLocaleString('en-IN') %>">
+                  <i class="bi bi-file-earmark-plus me-1"></i>Generate Voucher
+                </button>
+              </form>
+            <% } else { %>
+              <a href="/rep-payments/<%= proj.rep_payment_id %>/slip"
+                 class="btn btn-xs btn-outline-secondary"
+                 style="font-size:.72rem;padding:2px 8px;" target="_blank">
+                <i class="bi bi-receipt me-1"></i>View Slip
+              </a>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+      <tfoot>
+        <tr class="table-light">
+          <td colspan="4" class="text-end small fw-bold">Total</td>
+          <td class="text-end fw-bold" style="color:#303493;">₹<%= repTotal.toLocaleString('en-IN') %></td>
+          <td></td>
+          <td class="text-center small text-muted">
+            <% if (repPaid > 0) { %><span class="text-success">₹<%= repPaid.toLocaleString('en-IN') %> paid</span><% } %>
+            <% if (repPending > 0) { %><span class="text-warning ms-1">₹<%= repPending.toLocaleString('en-IN') %> pending</span><% } %>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+<% }) %>
+<% } %>

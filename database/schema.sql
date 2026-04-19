@@ -129,6 +129,23 @@ CREATE TABLE IF NOT EXISTS statements (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Representative Payments (commission vouchers per rep per project)
+CREATE TABLE IF NOT EXISTS rep_payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  representative_id INTEGER NOT NULL REFERENCES representatives(id),
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  amount REAL NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'Pending' CHECK(status IN ('Pending','Paid')),
+  payment_method TEXT,
+  notes TEXT,
+  paid_on DATETIME,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(representative_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS idx_rep_payments_rep ON rep_payments(representative_id);
+CREATE INDEX IF NOT EXISTS idx_rep_payments_project ON rep_payments(project_id);
+
 -- Migrations (safe — ALTER TABLE is ignored if column already exists via error suppression in db.js)
 ALTER TABLE vouchers ADD COLUMN voucher_date DATE;
 ALTER TABLE projects ADD COLUMN project_type TEXT NOT NULL DEFAULT 'Film';

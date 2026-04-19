@@ -182,6 +182,7 @@ app.use('/members', require('./routes/members'));
 app.use('/projects', require('./routes/projects'));
 app.use('/vouchers', require('./routes/vouchers'));
 app.use('/statements', require('./routes/statements'));
+app.use('/rep-payments', require('./routes/repPayments'));
 app.use('/reports', require('./routes/reports'));
 app.use('/users', require('./routes/users'));
 
