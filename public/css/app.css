@@ -198,6 +198,36 @@ a:hover { color: var(--primary-dark); }
   display: block;
 }
 
+/* Medium switcher */
+.medium-switcher {
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.medium-switcher-label {
+  font-size: 9px;
+  color: rgba(255,255,255,.45);
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  margin-bottom: 7px;
+  font-weight: 600;
+}
+.medium-switcher-pills { display: flex; gap: 6px; }
+.medium-pill {
+  flex: 1;
+  background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.6);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 20px;
+  padding: 5px 0;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+  font-family: inherit;
+}
+.medium-pill:hover { background: rgba(255,255,255,.18); color: #fff; border-color: rgba(255,255,255,.4); }
+.medium-pill-active { background: rgba(255,255,255,.22) !important; color: #fff !important; border-color: rgba(255,255,255,.55) !important; }
+
 /* Footer */
 .sidebar-footer {
   border-top: 1px solid rgba(255,255,255,.08);

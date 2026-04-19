@@ -38,6 +38,7 @@
         <label class="form-label">Production Contact No</label>
         <input type="text" name="production_contact_no" class="form-control" value="<%= project.production_contact_no || '' %>">
       </div>
+      <% if (locals.activeMedium !== 'Television') { %>
       <div class="col-md-6">
         <label class="form-label">Representative Name</label>
         <select name="representative_id" class="form-select select2-search" id="rep_select">
@@ -45,6 +46,7 @@
           <% reps.forEach(r => { %><option value="<%= r.id %>" <%= project.representative_id == r.id ? 'selected' : '' %>><%= r.name %></option><% }) %>
         </select>
       </div>
+      <% } %>
       <div class="col-md-6">
         <label class="form-label">Place of Dubbing</label>
         <input type="text" name="place_of_dubbing" class="form-control" value="<%= project.place_of_dubbing || '' %>">

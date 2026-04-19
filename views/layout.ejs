@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="/css/app.css">
   <%- typeof pageStyles !== 'undefined' ? pageStyles : '' %>
 </head>
-<body>
+<body data-medium="<%= typeof activeMedium !== 'undefined' ? activeMedium : 'Film' %>">
 <div class="wrapper d-flex">
 
   <!-- ══ Sidebar ══════════════════════════════════════ -->
@@ -30,6 +30,29 @@
       </div>
     </div>
 
+    <!-- Medium switcher -->
+    <% if (currentUser && activeMedium) { %>
+    <div class="medium-switcher">
+      <div class="medium-switcher-label">Active Medium</div>
+      <div class="medium-switcher-pills">
+        <form action="/auth/select-medium" method="POST" class="d-inline">
+          <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+          <input type="hidden" name="medium" value="Film">
+          <button type="submit" class="medium-pill <%= activeMedium === 'Film' ? 'medium-pill-active' : '' %>">
+            🎬 Film
+          </button>
+        </form>
+        <form action="/auth/select-medium" method="POST" class="d-inline">
+          <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+          <input type="hidden" name="medium" value="Television">
+          <button type="submit" class="medium-pill <%= activeMedium === 'Television' ? 'medium-pill-active' : '' %>">
+            📺 TV
+          </button>
+        </form>
+      </div>
+    </div>
+    <% } %>
+
     <!-- Nav -->
     <ul class="nav flex-column flex-grow-1">
       <li class="nav-item">
@@ -39,7 +62,7 @@
       </li>
       <li class="nav-item">
         <a href="/projects" class="nav-link <%= locals.activePage === 'projects' ? 'active' : '' %>">
-          <i class="bi bi-file-earmark-text"></i>Working Reports
+          <i class="bi bi-file-earmark-text"></i><%= activeMedium === 'Television' ? 'TV Projects' : 'Working Reports' %>
         </a>
       </li>
       <li class="nav-item">

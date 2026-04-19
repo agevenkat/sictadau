@@ -9,14 +9,16 @@ exports.index = async (req, res) => {
   await db.ready;
   const search = req.query.search || '';
   const status = req.query.status || '';
+  const medium = req.session.activeMedium || 'Film';
   const stats = await db.prepare(`SELECT
     COUNT(*) as total,
     SUM(amount) as total_amount,
     SUM(payment_received) as total_received,
     SUM(CASE WHEN status='Pending' THEN 1 ELSE 0 END) as pending,
     SUM(CASE WHEN status='Paid' THEN 1 ELSE 0 END) as paid
-    FROM projects`).get();
-  res.render('projects/index', { title: 'Working Reports', stats, search, status, STATUSES });
+    FROM projects WHERE project_type = ?`).get(medium);
+  const pageTitle = medium === 'Television' ? 'TV Projects' : 'Working Reports';
+  res.render('projects/index', { title: pageTitle, stats, search, status, STATUSES, medium });
 };
 
 exports.data = async (req, res) => {
@@ -34,19 +36,20 @@ exports.data = async (req, res) => {
     const colMap = { 0: 'p.start_date', 1: 'p.end_date', 2: 'p.production_company', 3: 'p.film_name', 4: 'r.name', 5: 'p.amount', 6: 'p.status' };
     const orderBy = colMap[orderColIdx] || 'p.start_date';
 
-    const whereParts = [];
-    const filterParams = [];
+    const medium = req.session.activeMedium || 'Film';
+    const whereParts = ['p.project_type = ?'];
+    const filterParams = [medium];
     if (search) {
       whereParts.push('(p.film_name LIKE ? OR p.production_company LIKE ? OR p.invoice_no LIKE ?)');
       filterParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
     if (status) { whereParts.push('p.status = ?'); filterParams.push(status); }
 
-    const where = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
+    const where = 'WHERE ' + whereParts.join(' AND ');
     const baseJoin = 'FROM projects p LEFT JOIN representatives r ON p.representative_id = r.id';
 
     const batchResults = await db.batch([
-      { sql: 'SELECT COUNT(*) as cnt FROM projects', args: [] },
+      { sql: 'SELECT COUNT(*) as cnt FROM projects WHERE project_type = ?', args: [medium] },
       { sql: `SELECT COUNT(*) as cnt ${baseJoin} ${where}`, args: filterParams },
       { sql: `SELECT p.id, p.film_name, p.production_company, p.language, p.start_date, p.end_date,
               p.amount, p.payment_received, p.status, r.name as rep_name
@@ -66,16 +69,17 @@ exports.data = async (req, res) => {
 
 exports.exportCsv = async (req, res) => {
   await db.ready;
+  const medium = req.session.activeMedium || 'Film';
   const search = (req.query.search || '').trim();
   const status = req.query.status || '';
-  const whereParts = [];
-  const filterParams = [];
+  const whereParts = ['p.project_type = ?'];
+  const filterParams = [medium];
   if (search) {
     whereParts.push('(p.film_name LIKE ? OR p.production_company LIKE ? OR p.invoice_no LIKE ?)');
     filterParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (status) { whereParts.push('p.status = ?'); filterParams.push(status); }
-  const where = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
+  const where = 'WHERE ' + whereParts.join(' AND ');
   const rows = await db.prepare(
     `SELECT p.id, p.film_name, p.production_company, p.language, p.start_date, p.end_date,
             p.amount, p.payment_received, p.status, p.invoice_no, r.name as rep_name
@@ -92,17 +96,20 @@ exports.exportCsv = async (req, res) => {
 
 exports.showCreate = async (req, res) => {
   await db.ready;
+  const medium = req.session.activeMedium || 'Film';
   const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
+  const pageTitle = medium === 'Television' ? 'New TV Project' : 'New Working Report';
   res.render('projects/form', {
-    title: 'New Working Report',
-    project: { status: 'Pending', amount: 0 },
-    reps, LANGUAGES, STATUSES, errors: []
+    title: pageTitle,
+    project: { status: 'Pending', amount: 0, project_type: medium },
+    reps, LANGUAGES, STATUSES, errors: [], medium
   });
 };
 
 exports.create = async (req, res) => {
   try {
     await db.ready;
+    const medium = req.session.activeMedium || 'Film';
     const data = sanitize(req.body);
     const validation = validate(data);
     const errors = validation.errors || [];
@@ -115,7 +122,8 @@ exports.create = async (req, res) => {
 
     if (errors.length) {
       const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
-      return res.render('projects/form', { title: 'New Working Report', project: data, reps, LANGUAGES, STATUSES, errors, warnings });
+      const pageTitle = medium === 'Television' ? 'New TV Project' : 'New Working Report';
+      return res.render('projects/form', { title: pageTitle, project: data, reps, LANGUAGES, STATUSES, errors, warnings, medium });
     }
 
     if (warnings.length) warnings.forEach(w => req.flash('warning', w));
@@ -123,13 +131,13 @@ exports.create = async (req, res) => {
     const result = await db.prepare(`INSERT INTO projects
       (film_name, production_company, production_company_address, language, production_contact_no,
        representative_id, place_of_dubbing, start_date, end_date, company_email, amount,
-       payment_received, invoice_no, representative_form, working_report_file, status)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+       payment_received, invoice_no, representative_form, working_report_file, status, project_type)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
       data.film_name, data.production_company, data.production_company_address, data.language,
       data.production_contact_no, data.representative_id, data.place_of_dubbing, data.start_date,
       data.end_date, data.company_email, data.amount, data.payment_received, data.invoice_no,
-      data.representative_form, data.working_report_file, data.status
+      data.representative_form, data.working_report_file, data.status, medium
     );
 
     req.flash('success', `Project "${data.film_name}" created successfully.`);
@@ -368,7 +376,9 @@ exports.showEdit = async (req, res) => {
   const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
   if (!project) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
   const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
-  res.render('projects/form', { title: 'Edit Working Report', project, reps, LANGUAGES, STATUSES, errors: [], isEdit: true });
+  const medium = project.project_type || 'Film';
+  const pageTitle = medium === 'Television' ? 'Edit TV Project' : 'Edit Working Report';
+  res.render('projects/form', { title: pageTitle, project, reps, LANGUAGES, STATUSES, errors: [], isEdit: true, medium });
 };
 
 exports.update = async (req, res) => {

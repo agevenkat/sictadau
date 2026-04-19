@@ -49,10 +49,19 @@ function attachUser(req, res, next) {
         role: req.session.userRole
       }
     : null;
+  res.locals.activeMedium = req.session?.activeMedium || null;
   res.locals.flash_success = req.flash('success');
   res.locals.flash_error = req.flash('error');
   res.locals.flash_info = req.flash('info');
   next();
 }
 
-module.exports = { requireAuth, requireAdmin, requireSuperAdmin, redirectIfAuth, attachUser };
+// Redirect authenticated users to select-medium if they haven't chosen one yet
+function requireMedium(req, res, next) {
+  if (!req.session?.activeMedium) {
+    return res.redirect('/auth/select-medium');
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireAdmin, requireSuperAdmin, redirectIfAuth, attachUser, requireMedium };

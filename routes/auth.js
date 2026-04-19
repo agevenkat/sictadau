@@ -2,7 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const { redirectIfAuth } = require('../middleware/auth');
+const { redirectIfAuth, requireAuth } = require('../middleware/auth');
 
 // Strict rate limit on login — 10 attempts per 15 min per IP
 const loginLimiter = rateLimit({
@@ -20,5 +20,7 @@ const loginLimiter = rateLimit({
 router.get('/login', redirectIfAuth, authController.showLogin);
 router.post('/login', redirectIfAuth, loginLimiter, authController.login);
 router.post('/logout', authController.logout);
+router.get('/select-medium', requireAuth, authController.showSelectMedium);
+router.post('/select-medium', requireAuth, authController.selectMedium);
 
 module.exports = router;

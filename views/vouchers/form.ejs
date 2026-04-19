@@ -60,6 +60,7 @@
               <% }) %>
             </select>
           </div>
+          <% if (locals.activeMedium !== 'Television') { %>
           <div class="col-md-6">
             <label class="form-label">Representative Name</label>
             <select name="representative_id" id="rep_select" class="form-select select2-search">
@@ -69,6 +70,13 @@
               <% }) %>
             </select>
           </div>
+          <% } %>
+          <% if (locals.activeMedium === 'Television') { %>
+          <div class="col-md-6">
+            <label class="form-label">Episode No.</label>
+            <input type="text" name="episode_no" class="form-control" placeholder="e.g. EP 01, EP 02" value="<%= voucher.episode_no || '' %>">
+          </div>
+          <% } %>
           <div class="col-md-6">
             <label class="form-label">Character</label>
             <select name="character" class="form-select">
@@ -98,13 +106,13 @@
               <input type="number" name="amount" id="amount" class="form-control" value="<%= voucher.amount || '' %>" step="0.01" min="0" required>
             </div>
           </div>
+
+          <% if (locals.activeMedium !== 'Television') { %>
           <div class="col-md-6">
             <label class="form-label">GW Fund %</label>
-            <div class="input-group">
-              <select name="gw_fund_percent" id="gw_fund_percent" class="form-select">
-                <% [5,10].forEach(p => { %><option value="<%= p %>" <%= voucher.gw_fund_percent == p ? 'selected' : '' %>><%= p %>%</option><% }) %>
-              </select>
-            </div>
+            <select name="gw_fund_percent" id="gw_fund_percent" class="form-select">
+              <% [5,10].forEach(p => { %><option value="<%= p %>" <%= voucher.gw_fund_percent == p ? 'selected' : '' %>><%= p %>%</option><% }) %>
+            </select>
           </div>
           <div class="col-md-6">
             <label class="form-label">GW Fund Amount</label>
@@ -126,11 +134,23 @@
               <input type="number" id="representative_amount" class="form-control bg-light" value="<%= voucher.representative_amount || '' %>" readonly>
             </div>
           </div>
+          <% } else { %>
+          <!-- TV: no deductions, hidden fields set to 0 -->
+          <input type="hidden" name="gw_fund_percent" value="0">
+          <input type="hidden" name="representative_percent" value="0">
+          <div class="col-12">
+            <div class="alert alert-info py-2 mb-0 small">
+              <i class="bi bi-info-circle me-1"></i>
+              <strong>Television mode:</strong> No GW Fund or representative deductions — full amount paid to artist.
+            </div>
+          </div>
+          <% } %>
+
           <div class="col-12">
             <label class="form-label fw-bold">Final Amount</label>
             <div class="input-group">
               <span class="input-group-text fw-bold">₹</span>
-              <input type="number" id="final_amount" class="form-control bg-light fw-bold" value="<%= voucher.final_amount || '' %>" readonly>
+              <input type="number" id="final_amount" class="form-control bg-light fw-bold" value="<%= voucher.final_amount || voucher.amount || '' %>" readonly>
             </div>
           </div>
         </div>

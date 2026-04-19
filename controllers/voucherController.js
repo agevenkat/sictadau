@@ -5,6 +5,7 @@ const GW_PERCENT = 5;
 
 exports.index = async (req, res) => {
   await db.ready;
+  const medium = req.session.activeMedium || 'Film';
   const search = req.query.search || '';
   const status = req.query.status || '';
   const project_id = req.query.project_id || '';
@@ -12,13 +13,13 @@ exports.index = async (req, res) => {
   const to = req.query.to || '';
   const stats = await db.prepare(`SELECT
     COUNT(*) as total,
-    SUM(final_amount) as total_final,
-    SUM(CASE WHEN status='Pending' THEN 1 ELSE 0 END) as pending,
-    SUM(CASE WHEN status='Paid' THEN 1 ELSE 0 END) as paid,
-    SUM(CASE WHEN status='Paid' THEN final_amount ELSE 0 END) as paid_amount
-    FROM vouchers`).get();
-  const projects = await db.prepare('SELECT id, film_name FROM projects ORDER BY film_name').all();
-  res.render('vouchers/index', { title: 'Artist Vouchers', stats, search, status, project_id, from, to, projects });
+    SUM(v.final_amount) as total_final,
+    SUM(CASE WHEN v.status='Pending' THEN 1 ELSE 0 END) as pending,
+    SUM(CASE WHEN v.status='Paid' THEN 1 ELSE 0 END) as paid,
+    SUM(CASE WHEN v.status='Paid' THEN v.final_amount ELSE 0 END) as paid_amount
+    FROM vouchers v JOIN projects p ON v.project_id = p.id WHERE p.project_type = ?`).get(medium);
+  const projects = await db.prepare('SELECT id, film_name FROM projects WHERE project_type = ? ORDER BY film_name').all(medium);
+  res.render('vouchers/index', { title: 'Artist Vouchers', stats, search, status, project_id, from, to, projects, medium });
 };
 
 exports.data = async (req, res) => {
@@ -40,8 +41,9 @@ exports.data = async (req, res) => {
     const colMap = { 1: 'COALESCE(v.voucher_date, v.created_at)', 2: 'm.full_name', 3: 'p.film_name', 4: 'm.bank_account_no', 5: 'm.ifsc_code', 6: 'm.bank_name', 7: 'v.final_amount', 8: 'v.status' };
     const orderBy = colMap[orderColIdx] || 'COALESCE(v.voucher_date, v.created_at)';
 
-    const whereParts = [];
-    const filterParams = [];
+    const medium = req.session.activeMedium || 'Film';
+    const whereParts = ['p.project_type = ?'];
+    const filterParams = [medium];
     if (search) {
       whereParts.push('(m.full_name LIKE ? OR m.membership_no LIKE ? OR p.film_name LIKE ?)');
       filterParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
@@ -51,14 +53,14 @@ exports.data = async (req, res) => {
     if (from) { whereParts.push('COALESCE(v.voucher_date, date(v.created_at)) >= ?'); filterParams.push(from); }
     if (to) { whereParts.push('COALESCE(v.voucher_date, date(v.created_at)) <= ?'); filterParams.push(to); }
 
-    const where = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
+    const where = 'WHERE ' + whereParts.join(' AND ');
     const baseJoin = `FROM vouchers v
       JOIN members m ON v.member_id = m.id
       JOIN projects p ON v.project_id = p.id
       LEFT JOIN representatives r ON v.representative_id = r.id`;
 
     const batchResults = await db.batch([
-      { sql: 'SELECT COUNT(*) as cnt FROM vouchers', args: [] },
+      { sql: 'SELECT COUNT(*) as cnt FROM vouchers v JOIN projects p ON v.project_id = p.id WHERE p.project_type = ?', args: [medium] },
       { sql: `SELECT COUNT(*) as cnt ${baseJoin} ${where}`, args: filterParams },
       { sql: `SELECT v.id, v.member_id, v.project_id, v.status, v.final_amount,
               COALESCE(v.voucher_date, date(v.created_at)) AS voucher_date, v.created_at,
@@ -94,13 +96,14 @@ exports.data = async (req, res) => {
 
 exports.exportCsv = async (req, res) => {
   await db.ready;
+  const medium = req.session.activeMedium || 'Film';
   const search = (req.query.search || '').trim();
   const status = req.query.status || '';
   const project_id = req.query.project_id || '';
   const from = req.query.from || '';
   const to = req.query.to || '';
-  const whereParts = [];
-  const filterParams = [];
+  const whereParts = ['p.project_type = ?'];
+  const filterParams = [medium];
   if (search) {
     whereParts.push('(m.full_name LIKE ? OR m.membership_no LIKE ? OR p.film_name LIKE ?)');
     filterParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
@@ -109,7 +112,7 @@ exports.exportCsv = async (req, res) => {
   if (project_id) { whereParts.push('v.project_id = ?'); filterParams.push(parseInt(project_id)); }
   if (from) { whereParts.push('COALESCE(v.voucher_date, date(v.created_at)) >= ?'); filterParams.push(from); }
   if (to) { whereParts.push('COALESCE(v.voucher_date, date(v.created_at)) <= ?'); filterParams.push(to); }
-  const where = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
+  const where = 'WHERE ' + whereParts.join(' AND ');
   const rows = await db.prepare(
     `SELECT v.id, m.membership_no, m.full_name, p.film_name, v.amount, v.gw_fund_amount,
             v.representative_amount, v.final_amount, v.status, v.payment_method, v.paid_on,
@@ -179,13 +182,15 @@ exports.checkDuplicate = async (req, res) => {
 
 exports.showCreate = async (req, res) => {
   await db.ready;
+  const medium = req.session.activeMedium || 'Film';
+  const isTv = medium === 'Television';
   const members = await db.prepare("SELECT id, membership_no, full_name FROM members WHERE status='Active' ORDER BY CAST(membership_no AS INTEGER)").all();
-  const projects = await db.prepare("SELECT id, film_name, representative_id FROM projects WHERE status != 'Paid' ORDER BY film_name").all();
+  const projects = await db.prepare("SELECT id, film_name, representative_id FROM projects WHERE status != 'Paid' AND project_type = ? ORDER BY film_name").all(medium);
   const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
   const preProject = req.query.project_id ? parseInt(req.query.project_id) : null;
 
   let preRepresentative = null;
-  if (preProject) {
+  if (preProject && !isTv) {
     const project = projects.find(p => p.id === preProject);
     preRepresentative = project?.representative_id || null;
   }
@@ -194,41 +199,49 @@ exports.showCreate = async (req, res) => {
     title: 'New Voucher',
     voucher: {
       status: 'Pending',
-      gw_fund_percent: GW_PERCENT,
-      representative_percent: 5,
+      gw_fund_percent: isTv ? 0 : GW_PERCENT,
+      representative_percent: isTv ? 0 : 5,
       project_id: preProject,
       representative_id: preRepresentative
     },
-    members, projects, reps, CHARACTERS, errors: []
+    members, projects, reps, CHARACTERS, errors: [], medium
   });
 };
 
 exports.create = async (req, res) => {
   await db.ready;
+  const medium = req.session.activeMedium || 'Film';
   const data = sanitize(req.body);
   const errors = validate(data);
 
   if (errors.length) {
     const members = await db.prepare("SELECT id, membership_no, full_name FROM members WHERE status='Active' ORDER BY CAST(membership_no AS INTEGER)").all();
-    const projects = await db.prepare("SELECT id, film_name FROM projects ORDER BY film_name").all();
+    const projects = await db.prepare("SELECT id, film_name FROM projects WHERE project_type = ? ORDER BY film_name").all(medium);
     const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
-    return res.render('vouchers/form', { title: 'New Voucher', voucher: data, members, projects, reps, CHARACTERS, errors });
+    return res.render('vouchers/form', { title: 'New Voucher', voucher: data, members, projects, reps, CHARACTERS, errors, medium });
   }
 
-  if (!data.representative_id) {
-    const proj = await db.prepare('SELECT representative_id FROM projects WHERE id = ?').get(data.project_id);
-    if (proj?.representative_id) data.representative_id = proj.representative_id;
+  // TV projects: zero out all deductions — full amount goes to artist
+  if (data.project_id) {
+    const proj = await db.prepare('SELECT project_type, representative_id FROM projects WHERE id = ?').get(data.project_id);
+    if (proj?.project_type === 'Television') {
+      data.gw_fund_percent = 0; data.gw_fund_amount = 0;
+      data.representative_percent = 0; data.representative_amount = 0;
+      data.final_amount = data.amount;
+    } else if (!data.representative_id && proj?.representative_id) {
+      data.representative_id = proj.representative_id;
+    }
   }
 
   const result = await db.prepare(`INSERT INTO vouchers
     (voucher_type, member_id, project_id, character, representative_id, status, voucher_date,
-     amount, gw_fund_percent, gw_fund_amount, representative_percent, representative_amount, final_amount)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+     amount, gw_fund_percent, gw_fund_amount, representative_percent, representative_amount, final_amount, episode_no)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
   ).run(
     data.voucher_type, data.member_id, data.project_id, data.character,
     data.representative_id, data.status, data.voucher_date, data.amount,
     data.gw_fund_percent, data.gw_fund_amount, data.representative_percent,
-    data.representative_amount, data.final_amount
+    data.representative_amount, data.final_amount, data.episode_no || null
   );
 
   req.flash('success', 'Voucher created successfully.');
@@ -257,10 +270,12 @@ exports.showEdit = async (req, res) => {
   await db.ready;
   const voucher = await db.prepare('SELECT * FROM vouchers WHERE id = ?').get(req.params.id);
   if (!voucher) { req.flash('error', 'Voucher not found.'); return res.redirect('/vouchers'); }
+  const proj = await db.prepare('SELECT project_type FROM projects WHERE id = ?').get(voucher.project_id);
+  const medium = proj?.project_type || req.session.activeMedium || 'Film';
   const members = await db.prepare("SELECT id, membership_no, full_name FROM members ORDER BY CAST(membership_no AS INTEGER)").all();
-  const projects = await db.prepare('SELECT id, film_name FROM projects ORDER BY film_name').all();
+  const projects = await db.prepare('SELECT id, film_name FROM projects WHERE project_type = ? ORDER BY film_name').all(medium);
   const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
-  res.render('vouchers/form', { title: 'Edit Voucher', voucher, members, projects, reps, CHARACTERS, errors: [], isEdit: true });
+  res.render('vouchers/form', { title: 'Edit Voucher', voucher, members, projects, reps, CHARACTERS, errors: [], isEdit: true, medium });
 };
 
 exports.update = async (req, res) => {
@@ -278,15 +293,25 @@ exports.update = async (req, res) => {
     return res.render('vouchers/form', { title: 'Edit Voucher', voucher: { ...voucher, ...data }, members, projects, reps, CHARACTERS, errors, isEdit: true });
   }
 
+  // TV projects: zero out all deductions
+  if (data.project_id) {
+    const proj = await db.prepare('SELECT project_type FROM projects WHERE id = ?').get(data.project_id);
+    if (proj?.project_type === 'Television') {
+      data.gw_fund_percent = 0; data.gw_fund_amount = 0;
+      data.representative_percent = 0; data.representative_amount = 0;
+      data.final_amount = data.amount;
+    }
+  }
+
   await db.prepare(`UPDATE vouchers SET voucher_type=?, member_id=?, project_id=?, character=?,
     representative_id=?, status=?, voucher_date=?, amount=?, gw_fund_percent=?, gw_fund_amount=?,
-    representative_percent=?, representative_amount=?, final_amount=?, updated_at=CURRENT_TIMESTAMP
+    representative_percent=?, representative_amount=?, final_amount=?, episode_no=?, updated_at=CURRENT_TIMESTAMP
     WHERE id=?`
   ).run(
     data.voucher_type, data.member_id, data.project_id, data.character,
     data.representative_id, data.status, data.voucher_date, data.amount, data.gw_fund_percent,
     data.gw_fund_amount, data.representative_percent, data.representative_amount,
-    data.final_amount, voucher.id
+    data.final_amount, data.episode_no || null, voucher.id
   );
 
   req.flash('success', 'Voucher updated.');
@@ -381,6 +406,7 @@ function sanitize(body) {
     representative_id: body.representative_id ? parseInt(body.representative_id) : null,
     status: body.status || 'Pending',
     voucher_date: vDate,
+    episode_no: (body.episode_no || '').trim() || null,
     amount, gw_fund_percent: gwPct, gw_fund_amount: gwAmt,
     representative_percent: repPct, representative_amount: repAmt, final_amount: finalAmt
   };

@@ -158,6 +158,15 @@ app.use((req, res, next) => {
 const { attachUser } = require('./middleware/auth');
 app.use(attachUser);
 
+// ---- Medium gate: authenticated users must pick Film/TV before accessing app ----
+app.use((req, res, next) => {
+  if (!req.session?.userId) return next();          // not logged in
+  if (req.path.startsWith('/auth')) return next();  // auth pages
+  if (req.session.activeMedium) return next();      // medium already set
+  if (req.method === 'GET' && req.accepts('html')) return res.redirect('/auth/select-medium');
+  next();
+});
+
 // ---- Ready-gate: block requests until DB is initialised + admin seeded ----
 // appReady is set below after seedAdmin() is defined; Promise is already settled
 // on warm Lambdas so this adds zero latency on all but the very first cold start.

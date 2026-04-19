@@ -28,6 +28,14 @@ document.addEventListener('submit', function (e) {
 // Auto-calculate voucher amounts
 function calcVoucherAmounts() {
   const amount = parseFloat(document.getElementById('amount')?.value) || 0;
+  const finalEl = document.getElementById('final_amount');
+
+  // TV mode: no deductions — final = gross
+  if (document.body.dataset.medium === 'Television') {
+    if (finalEl) finalEl.value = amount.toFixed(2);
+    return;
+  }
+
   const gwPct = parseFloat(document.getElementById('gw_fund_percent')?.value) || 5;
   const repPct = parseFloat(document.getElementById('representative_percent')?.value) || 5;
 
@@ -37,7 +45,6 @@ function calcVoucherAmounts() {
 
   const gwAmtEl = document.getElementById('gw_fund_amount');
   const repAmtEl = document.getElementById('representative_amount');
-  const finalEl = document.getElementById('final_amount');
 
   if (gwAmtEl) gwAmtEl.value = gwAmt;
   if (repAmtEl) repAmtEl.value = repAmt;

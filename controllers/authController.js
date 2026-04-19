@@ -61,10 +61,11 @@ exports.login = async (req, res) => {
     req.session.userName = user.name;
     req.session.userEmail = user.email;
     req.session.userRole = user.role;
+    req.session.activeMedium = null; // force medium selection on every login
     if (req.session.save) {
-      req.session.save(() => res.redirect('/dashboard'));
+      req.session.save(() => res.redirect('/auth/select-medium'));
     } else {
-      res.redirect('/dashboard');
+      res.redirect('/auth/select-medium');
     }
   };
 
@@ -79,6 +80,23 @@ exports.login = async (req, res) => {
   } else {
     req.session = {};
     doLogin();
+  }
+};
+
+exports.showSelectMedium = (req, res) => {
+  res.render('auth/select-medium', { title: 'Select Medium — SICTADAU', layout: false });
+};
+
+exports.selectMedium = (req, res) => {
+  const medium = req.body.medium;
+  if (!['Film', 'Television'].includes(medium)) {
+    return res.redirect('/auth/select-medium');
+  }
+  req.session.activeMedium = medium;
+  if (req.session.save) {
+    req.session.save(() => res.redirect('/dashboard'));
+  } else {
+    res.redirect('/dashboard');
   }
 };
 

@@ -9,22 +9,24 @@ const PAYMENT_MODES = ['Cash', 'NEFT', 'Cheque', 'Others'];
 
 exports.index = async (req, res) => {
   await db.ready;
+  const medium = req.session.activeMedium || 'Film';
   const search = req.query.search || '';
   const type = req.query.type || '';
   const from = req.query.from || '';
   const to = req.query.to || '';
 
   const totals = await db.prepare(`SELECT
-    SUM(CASE WHEN amount_type='Credit' THEN amount ELSE 0 END) as total_credit,
-    SUM(CASE WHEN amount_type='Debit' THEN amount ELSE 0 END) as total_debit
-    FROM statements`).get();
+    SUM(CASE WHEN s.amount_type='Credit' THEN s.amount ELSE 0 END) as total_credit,
+    SUM(CASE WHEN s.amount_type='Debit' THEN s.amount ELSE 0 END) as total_debit
+    FROM statements s LEFT JOIN projects p ON s.project_id = p.id
+    WHERE (s.project_id IS NULL OR p.project_type = ?)`).get(medium);
 
   const balance = (totals.total_credit || 0) - (totals.total_debit || 0);
-  const projects = await db.prepare('SELECT id, film_name FROM projects ORDER BY film_name').all();
+  const projects = await db.prepare('SELECT id, film_name FROM projects WHERE project_type = ? ORDER BY film_name').all(medium);
 
   res.render('statements/index', {
     title: 'Statement', totals, balance,
-    search, type, from, to, projects, INCOME_TYPES, PAYMENT_MODES
+    search, type, from, to, projects, INCOME_TYPES, PAYMENT_MODES, medium
   });
 };
 
@@ -45,8 +47,9 @@ exports.data = async (req, res) => {
     const colMap = { 0: 's.transaction_date', 1: 's.income_type', 2: 's.paid_to', 3: 'p.film_name', 4: 's.payment_mode', 5: 's.transaction_remarks', 6: 's.amount_type', 7: 's.amount' };
     const orderBy = colMap[orderColIdx] || 's.transaction_date';
 
-    const whereParts = [];
-    const filterParams = [];
+    const medium = req.session.activeMedium || 'Film';
+    const whereParts = ['(s.project_id IS NULL OR p.project_type = ?)'];
+    const filterParams = [medium];
     if (search) {
       whereParts.push('(s.paid_to LIKE ? OR s.income_type LIKE ? OR s.transaction_remarks LIKE ?)');
       filterParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
@@ -55,11 +58,11 @@ exports.data = async (req, res) => {
     if (from) { whereParts.push('s.transaction_date >= ?'); filterParams.push(from); }
     if (to) { whereParts.push('s.transaction_date <= ?'); filterParams.push(to); }
 
-    const where = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
+    const where = 'WHERE ' + whereParts.join(' AND ');
     const baseJoin = 'FROM statements s LEFT JOIN projects p ON s.project_id = p.id';
 
     const batchResults = await db.batch([
-      { sql: 'SELECT COUNT(*) as cnt FROM statements', args: [] },
+      { sql: 'SELECT COUNT(*) as cnt FROM statements s LEFT JOIN projects p ON s.project_id = p.id WHERE (s.project_id IS NULL OR p.project_type = ?)', args: [medium] },
       { sql: `SELECT COUNT(*) as cnt ${baseJoin} ${where}`, args: filterParams },
       { sql: `SELECT s.id, s.transaction_date, s.income_type, s.paid_to, s.payment_mode,
               s.transaction_remarks, s.amount_type, s.amount, s.receipt, p.film_name

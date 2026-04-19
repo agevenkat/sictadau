@@ -131,6 +131,8 @@ CREATE TABLE IF NOT EXISTS statements (
 
 -- Migrations (safe — ALTER TABLE is ignored if column already exists via error suppression in db.js)
 ALTER TABLE vouchers ADD COLUMN voucher_date DATE;
+ALTER TABLE projects ADD COLUMN project_type TEXT NOT NULL DEFAULT 'Film';
+ALTER TABLE vouchers ADD COLUMN episode_no TEXT;
 
 -- Backfill voucher_date from created_at for rows that still have NULL (safe to re-run)
 UPDATE vouchers SET voucher_date = date(created_at) WHERE voucher_date IS NULL;
