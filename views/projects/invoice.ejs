@@ -3,79 +3,172 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invoice — <%= project.film_name %></title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <title>Work Report — <%= project.film_name %></title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
-    body { font-family: 'Times New Roman', serif; font-size: 13px; }
-    .invoice-container { max-width: 900px; margin: 0 auto; padding: 20px; }
-    .header-table { width: 100%; margin-bottom: 15px; }
-    .union-logo { width: 80px; height: 80px; object-fit: contain; }
-    .section-header { background: #f0f0f0; font-weight: bold; padding: 4px 8px; border: 1px solid #ccc; }
-    table.data-table { width: 100%; border-collapse: collapse; }
-    table.data-table th, table.data-table td { border: 1px solid #999; padding: 5px 8px; }
-    table.data-table th { background: #f8f8f8; font-weight: bold; }
-    .meta-row { font-size: 12px; }
-    .total-box { border: 1px solid #ccc; padding: 8px; }
-    .signature-row { margin-top: 40px; }
-    @media print { .no-print { display:none !important; } body { margin: 0; } }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif; font-size: 13px; color: #000; background: #e8eaf0; margin: 0; padding: 24px; }
+    .wrap { max-width: 920px; margin: 0 auto; background: #fff; border-radius: 6px; box-shadow: 0 4px 24px rgba(0,0,0,.12); padding: 40px; }
+
+    /* ── action bar ───────────────────────────────── */
+    .actions { display: flex; gap: 10px; margin-bottom: 28px; }
+    .btn { padding: 8px 18px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+    .btn-blue   { background: #303493; color: #fff; }
+    .btn-muted  { background: #f0f0f0; color: #333; }
+
+    /* ── header ──────────────────────────────────── */
+    .inv-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #303493; padding-bottom: 18px; margin-bottom: 24px; }
+    .inv-header-left { font-size: 11px; color: #666; line-height: 1.9; }
+    .inv-title  { font-size: 22px; font-weight: 800; color: #303493; letter-spacing: -.3px; }
+    .inv-no     { font-size: 13px; color: #333; margin-top: 4px; }
+    .status-badge { display: inline-block; padding: 3px 14px; border-radius: 3px; font-size: 12px; font-weight: 700; color: #fff; margin-top: 6px; }
+
+    /* ── from / to ───────────────────────────────── */
+    .from-to { display: flex; border: 1px solid #ccc; margin-bottom: 26px; }
+    .from-box, .to-box { flex: 1; padding: 16px 18px; }
+    .from-box { border-right: 1px solid #ccc; display: flex; gap: 14px; }
+    .ft-label  { font-size: 10px; font-weight: 700; color: #303493; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 7px; }
+    .ft-name   { font-size: 14px; font-weight: 700; display: block; margin-bottom: 6px; }
+    .ft-detail { font-size: 11px; color: #444; line-height: 1.9; }
+
+    /* ── KPI summary ─────────────────────────────── */
+    .kpi-row { display: flex; background: linear-gradient(135deg, #303493 0%, #1a1d5e 100%); border-radius: 6px; overflow: hidden; margin-bottom: 26px; }
+    .kpi-box { flex: 1; padding: 20px 14px; text-align: center; border-right: 1px solid rgba(255,255,255,.18); }
+    .kpi-box:last-child { border-right: none; }
+    .kpi-label { font-size: 9px; color: rgba(255,255,255,.75); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 7px; font-weight: 600; }
+    .kpi-value { font-size: 20px; font-weight: 800; color: #fff; }
+    .kpi-value.red { color: #EE3134; }
+
+    /* ── section headings ────────────────────────── */
+    .sec-title { font-size: 14px; font-weight: 700; color: #303493; border-bottom: 2px solid #303493; padding-bottom: 8px; margin-bottom: 14px; }
+
+    /* ── tables ──────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 26px; }
+    thead tr { background: #303493; color: #fff; }
+    th { padding: 11px 12px; font-weight: 600; border: none; }
+    td { padding: 10px 12px; border-bottom: 1px solid #e8e8e8; }
+    tbody tr:nth-child(even) td { background: #f9f9f9; }
+    .tfooter td { background: #303493; color: #fff; font-weight: 700; }
+
+    /* ── bank box ────────────────────────────────── */
+    .bank-box { background: #f5f7ff; border-left: 4px solid #303493; border-radius: 4px; padding: 14px 18px; font-size: 12px; line-height: 1.9; }
+    .bank-box strong { color: #333; }
+
+    /* ── totals ──────────────────────────────────── */
+    .tot-box { border: 1px solid #ddd; border-radius: 4px; overflow: hidden; font-size: 13px; }
+    .tot-row { display: flex; justify-content: space-between; padding: 9px 16px; border-bottom: 1px solid #eee; }
+    .tot-row:last-child { border-bottom: none; font-weight: 700; background: #f5f7ff; }
+
+    /* ── signatures ──────────────────────────────── */
+    .sigs { display: flex; justify-content: space-around; margin-top: 50px; font-size: 12px; text-align: center; }
+    .sig-space { height: 40px; }
+    .sig-line { border-top: 2px solid #333; padding-top: 7px; font-weight: 600; line-height: 1.6; }
+
+    @media print {
+      body { background: #fff; padding: 0; }
+      .wrap { box-shadow: none; border-radius: 0; padding: 20px; }
+      .actions { display: none !important; }
+    }
   </style>
 </head>
 <body>
-<div class="invoice-container">
-  <!-- Print button -->
-  <div class="no-print mb-3 d-flex gap-2">
-    <button onclick="window.print()" class="btn btn-sm btn-dark"><i class="bi bi-printer me-1"></i>Print</button>
-    <a href="/projects/<%= project.id %>" class="btn btn-sm btn-outline-secondary">Back</a>
+<div class="wrap">
+
+  <%
+    const balance = (project.amount || 0) - (totalPaid || 0);
+    const vTotal  = vouchers.reduce((s, v) => s + (v.amount || 0), 0);
+    const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function fmtDate(d) {
+      if (!d) return '—';
+      const m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (!m) return String(d);
+      return `${m[3]}-${MON[parseInt(m[2], 10) - 1]}-${m[1]}`;
+    }
+  %>
+
+  <!-- Action bar (hidden when printing) -->
+  <div class="actions">
+    <button onclick="window.print()" class="btn btn-blue"><i class="bi bi-printer"></i>Print</button>
+    <a href="/projects/<%= project.id %>/download-invoice" class="btn btn-blue"><i class="bi bi-file-earmark-pdf"></i>Download PDF</a>
+    <a href="/projects/<%= project.id %>" class="btn btn-muted"><i class="bi bi-arrow-left"></i>Back</a>
   </div>
 
-  <!-- Header meta -->
-  <div class="d-flex justify-content-between mb-2 meta-row">
-    <div>
-      <div>Project Entry Date : <strong><%= project.start_date ? new Date(project.start_date).toLocaleDateString('en-IN', {year:'numeric', month:'2-digit', day:'2-digit'}) : '—' %></strong></div>
-      <div>Project End Date : <strong><%= project.end_date ? new Date(project.end_date).toLocaleDateString('en-IN', {year:'numeric', month:'2-digit', day:'2-digit'}) : '—' %></strong></div>
+  <!-- Header -->
+  <div class="inv-header">
+    <div class="inv-header-left">
+      <div>Entry Date &nbsp;: <strong><%= fmtDate(project.start_date) %></strong></div>
+      <div>End Date &nbsp;&nbsp;&nbsp;: <strong><%= fmtDate(project.end_date) %></strong></div>
     </div>
-    <div class="text-end">
-      <div>Invoice No. : <strong><%= project.invoice_no || '—' %></strong></div>
-      <div>Status : <strong><%= project.status %></strong></div>
+    <div style="text-align:right;">
+      <div class="inv-title">Working Report</div>
+      <div class="inv-no">Invoice No. : <strong><%= project.invoice_no || project.id %></strong></div>
+      <span class="status-badge" style="background:<%= project.status==='Paid'?'#303493':'#EE3134' %>;"><%= project.status %></span>
     </div>
   </div>
 
   <!-- From / To -->
-  <table class="header-table mb-3" style="border:1px solid #ccc;">
-    <tr>
-      <td style="width:50%;padding:12px;border-right:1px solid #ccc;vertical-align:top;">
-        <img src="/images/logo.png" alt="Logo" class="union-logo" style="float:left;margin-right:10px;" onerror="this.style.display='none'">
-        <div><strong>From:</strong></div>
-        <div><strong>South Indian Cine, Television Artistes and Dubbing Artistes Union</strong></div>
-        <div>ESTD : <strong>1983</strong> - Regd No. <strong>1337/MDS</strong></div>
-        <div>Affiliated with <strong>FEFSI</strong></div>
-        <div>10, Vijayaraghavapuram 4th Street, Saligramam, Chennai-600093</div>
-        <div>044-23650223, 23650225, 23650229</div>
-        <div>sictadau@gmail.com</div>
-      </td>
-      <td style="width:50%;padding:12px;vertical-align:top;">
-        <div><strong>To:</strong></div>
-        <div><strong><%= project.production_company %></strong></div>
-        <div>Project Name : <strong><%= project.film_name %></strong></div>
-        <div>Project Language : <strong><%= project.language || '—' %></strong></div>
-        <% if (project.place_of_dubbing) { %><div>POD : <strong><%= project.place_of_dubbing %></strong></div><% } %>
-        <% if (project.production_company_address) { %><div><%= project.production_company_address %></div><% } %>
-        <% if (project.production_contact_no) { %><div>Phone: <%= project.production_contact_no %></div><% } %>
-        <% if (project.company_email) { %><div>Email: <%= project.company_email %></div><% } %>
-        <% if (project.rep_name) { %><div>Representative: <strong><%= project.rep_name %></strong></div><% } %>
-      </td>
-    </tr>
-  </table>
+  <div class="from-to">
+    <div class="from-box">
+      <img src="/images/logo.png" style="width:72px;height:72px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'">
+      <div>
+        <div class="ft-label">From:</div>
+        <span class="ft-name">South Indian Cine, Television Artistes and Dubbing Artistes Union</span>
+        <div class="ft-detail">
+          ESTD : 1983 &mdash; Regd No. 1337/MDS<br>
+          Affiliated with FEFSI<br>
+          10, Vijayaraghavapuram 4th Street, Saligramam, Chennai-600093<br>
+          044-23650223, 23650225, 23650229 &bull; sictadau@gmail.com
+        </div>
+      </div>
+    </div>
+    <div class="to-box">
+      <div class="ft-label">To:</div>
+      <span class="ft-name"><%= project.production_company %></span>
+      <div class="ft-detail">
+        Film : <strong><%= project.film_name %></strong><br>
+        Language : <strong><%= project.language || '—' %></strong>
+        <% if (project.place_of_dubbing) { %><br>POD : <strong><%= project.place_of_dubbing %></strong><% } %>
+        <% if (project.production_company_address) { %><br><%= project.production_company_address %><% } %>
+        <% if (project.production_contact_no) { %><br>Contact : <%= project.production_contact_no %><% } %>
+        <% if (project.company_email) { %><br>Email : <%= project.company_email %><% } %>
+        <% if (project.rep_name) { %><br>Representative : <strong><%= project.rep_name %></strong><% } %>
+      </div>
+    </div>
+  </div>
 
-  <!-- Voucher table -->
-  <table class="data-table mb-3">
+  <!-- KPI Summary row -->
+  <div class="kpi-row">
+    <div class="kpi-box">
+      <div class="kpi-label">Total Amount</div>
+      <div class="kpi-value">₹<%= (project.amount||0).toLocaleString('en-IN') %></div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Amount Received</div>
+      <div class="kpi-value">₹<%= totalPaid.toLocaleString('en-IN') %></div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Balance</div>
+      <div class="kpi-value <%= balance > 0 ? 'red' : '' %>">₹<%= Math.abs(balance).toLocaleString('en-IN') %></div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Total Artists</div>
+      <div class="kpi-value"><%= vouchers.length %></div>
+    </div>
+  </div>
+
+  <!-- Artist Vouchers -->
+  <div class="sec-title">Artist Vouchers (<%= vouchers.length %>)</div>
+  <% if (vouchers.length === 0) { %>
+  <p style="color:#aaa;text-align:center;padding:24px 0;">No vouchers added yet</p>
+  <% } else { %>
+  <table>
     <thead>
       <tr>
         <th>ID</th>
         <th>Mem No.</th>
         <th>Dubbing Artist Name</th>
         <th>Character</th>
-        <th class="text-end">Total</th>
+        <th style="text-align:right;">Total Amount</th>
       </tr>
     </thead>
     <tbody>
@@ -83,73 +176,86 @@
       <tr>
         <td><%= v.id %></td>
         <td><%= v.membership_no %></td>
-        <td><%= v.full_name %></td>
+        <td style="font-weight:500;"><%= v.full_name %></td>
         <td><%= v.character || '—' %></td>
-        <td class="text-end">Rs. <%= (v.amount||0).toLocaleString('en-IN') %></td>
+        <td style="text-align:right;color:#303493;font-weight:700;">Rs. <%= (v.amount||0).toLocaleString('en-IN') %></td>
       </tr>
       <% }) %>
     </tbody>
+    <tfoot>
+      <tr class="tfooter">
+        <td colspan="4" style="text-align:right;">Total</td>
+        <td style="text-align:right;">Rs. <%= vTotal.toLocaleString('en-IN') %></td>
+      </tr>
+    </tfoot>
   </table>
+  <% } %>
 
-  <!-- Bank + Totals -->
-  <div class="row">
-    <div class="col-6">
-      <div style="font-size:12px;line-height:1.8;">
-        <div>A/C Name : <strong>South Indian Cine, Television Artistes and Dubbing Artistes Union</strong></div>
-        <div>A/C NO. : <strong>1616135000004793</strong></div>
-        <div>IFSC CODE : <strong>KVBL0001616</strong></div>
-        <div>BANK : <strong>KARUR VYSYA BANK, K.K.Nagar Branch</strong></div>
-        <div>PAN NO. : <strong>AADAS9061M</strong></div>
+  <!-- Bank details + Running totals side by side -->
+  <div style="display:flex;gap:20px;align-items:flex-start;margin-bottom:28px;">
+    <div style="flex:1;">
+      <div class="bank-box">
+        <div style="font-weight:700;color:#303493;margin-bottom:8px;">Bank Details</div>
+        <div><strong>A/C Name :</strong> South Indian Cine, Television Artistes and Dubbing Artistes Union</div>
+        <div><strong>A/C NO. &nbsp;:</strong> 1616135000004793 &nbsp;&nbsp; <strong>IFSC :</strong> KVBL0001616</div>
+        <div><strong>BANK &nbsp;&nbsp;&nbsp;&nbsp;:</strong> KARUR VYSYA BANK, K.K.Nagar Branch</div>
+        <div><strong>PAN NO. &nbsp;:</strong> AADAS9061M</div>
       </div>
     </div>
-    <div class="col-6">
-      <table class="total-box" style="width:100%;font-size:13px;">
-        <tr>
-          <td>Total</td>
-          <td class="text-end"><strong>Rs. <%= vouchers.reduce((s,v)=>s+(v.amount||0),0).toLocaleString('en-IN') %></strong></td>
-        </tr>
-        <tr>
-          <td>Total Amount Received</td>
-          <td class="text-end"><strong>Rs. <%= totalPaid.toLocaleString('en-IN') %></strong></td>
-        </tr>
-        <tr>
-          <td>Balance Amount</td>
-          <td class="text-end"><strong>Rs. <%= ((project.amount||0) - totalPaid).toLocaleString('en-IN') %></strong></td>
-        </tr>
-      </table>
+    <div style="flex:0 0 300px;">
+      <div class="tot-box">
+        <div class="tot-row"><span>Total Billed</span><span>Rs. <%= (project.amount||0).toLocaleString('en-IN') %></span></div>
+        <div class="tot-row"><span>Amount Received</span><span>Rs. <%= totalPaid.toLocaleString('en-IN') %></span></div>
+        <div class="tot-row">
+          <span>Balance Amount</span>
+          <span style="color:<%= balance > 0 ? '#EE3134' : '#303493' %>;">Rs. <%= balance.toLocaleString('en-IN') %></span>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Payment history -->
+  <!-- Payment History -->
   <% if (payments.length > 0) { %>
-  <div class="mt-3" style="border:1px solid #ccc;padding:10px;">
-    <div class="fw-bold mb-2">Payments History</div>
-    <table class="data-table">
-      <thead><tr><th>ID</th><th>Transaction Date</th><th>Payment Type</th><th>Notes</th><th class="text-end">Amount</th></tr></thead>
-      <tbody>
-        <% payments.forEach(p => { %>
-        <tr>
-          <td><%= p.id %></td>
-          <td><%= p.transaction_date %></td>
-          <td><%= p.payment_type %></td>
-          <td><%= p.notes || '' %></td>
-          <td class="text-end">Rs. <%= p.amount.toLocaleString('en-IN') %></td>
-        </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </div>
+  <div class="sec-title">Payment History</div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Notes</th>
+        <th style="text-align:right;">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% payments.forEach(p => { %>
+      <tr>
+        <td><%= p.id %></td>
+        <td><%= fmtDate(p.transaction_date) %></td>
+        <td style="font-weight:500;"><%= p.payment_type || '—' %></td>
+        <td><%= p.notes || '—' %></td>
+        <td style="text-align:right;color:#303493;font-weight:700;">Rs. <%= p.amount.toLocaleString('en-IN') %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+    <tfoot>
+      <tr class="tfooter">
+        <td colspan="4" style="text-align:right;">Total Amount Received</td>
+        <td style="text-align:right;">Rs. <%= totalPaid.toLocaleString('en-IN') %></td>
+      </tr>
+    </tfoot>
+  </table>
   <% } %>
 
   <!-- Signatures -->
-  <div class="signature-row d-flex justify-content-between mt-5">
-    <div>Co-ordinator <%= project.rep_name ? 'Mr.' + project.rep_name : '' %></div>
-    <div class="text-center">Manager / Secretary / Treasurer</div>
-    <div>For <%= project.production_company %></div>
+  <div style="border-top:2px solid #303493;padding-top:30px;"></div>
+  <div class="sigs">
+    <div><div class="sig-space"></div><div class="sig-line">Co-ordinator<br>Mr. C.D.Ananthraman</div></div>
+    <div><div class="sig-space"></div><div class="sig-line">Manager / Secretary<br>Treasurer</div></div>
+    <div><div class="sig-space"></div><div class="sig-line">For<br><%= project.production_company %></div></div>
   </div>
-  <div class="mt-3" style="font-size:11px;color:#666;">*Cheque subject to realisation</div>
-</div>
+  <div style="text-align:center;font-size:11px;color:#aaa;font-style:italic;margin-top:22px;">*Cheque subject to realisation</div>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</div>
 </body>
 </html>

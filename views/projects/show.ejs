@@ -22,6 +22,9 @@
       <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-printer me-1"></i>Print
       </button>
+      <a href="/projects/<%= project.id %>/invoice" class="btn btn-sm btn-outline-info" target="_blank">
+        <i class="bi bi-file-earmark-text me-1"></i>View Work Report
+      </a>
       <a href="/projects/<%= project.id %>/download-invoice" class="btn btn-sm btn-outline-danger">
         <i class="bi bi-file-earmark-pdf me-1"></i>PDF
       </a>
@@ -83,7 +86,15 @@
           <span class="badge badge-<%= project.status.toLowerCase() %>"><%= project.status %></span>
         </div>
         <div class="card-body">
-          <% const rows = [
+          <%
+          const _MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          function _fmtDate(d) {
+            if (!d) return null;
+            const m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/);
+            if (!m) return String(d);
+            return `${m[3]}-${_MON[parseInt(m[2],10)-1]}-${m[1]}`;
+          }
+          const rows = [
             ['Film Name',          project.film_name],
             ['Production Company', project.production_company],
             ['Language',           project.language],
@@ -92,8 +103,8 @@
             ['Email',              project.company_email],
             ['Representative',     project.rep_name],
             ['Invoice No',         project.invoice_no],
-            ['Entry Date',         project.start_date],
-            ['End Date',           project.end_date],
+            ['Entry Date',         _fmtDate(project.start_date)],
+            ['End Date',           _fmtDate(project.end_date)],
           ]; %>
           <% rows.forEach(([label, val]) => { if (!val) return; %>
           <div class="d-flex justify-content-between py-1 border-bottom border-light">
@@ -227,8 +238,8 @@
   <!-- Header -->
   <div style="margin-bottom:30px;display:flex;justify-content:space-between;border-bottom:3px solid #303493;padding-bottom:20px;">
     <div>
-      <div style="font-size:13px;margin-bottom:8px;">Project Entry Date : <strong><%= project.start_date %></strong></div>
-      <div style="font-size:13px;">Project End Date : <strong><%= project.end_date %></strong></div>
+      <div style="font-size:13px;margin-bottom:8px;">Project Entry Date : <strong><%= _fmtDate(project.start_date) || '—' %></strong></div>
+      <div style="font-size:13px;">Project End Date : <strong><%= _fmtDate(project.end_date) || '—' %></strong></div>
     </div>
     <div style="text-align:right;">
       <div style="font-size:13px;margin-bottom:8px;">Invoice No. : <strong style="color:#303493;font-size:18px;"><%= project.id %></strong></div>
