@@ -92,7 +92,15 @@
           return '<a href="/projects/' + row.id + '" class="fw-medium text-decoration-none">' + escHtml(row.film_name) + lang + '</a>';
         }
       },
-      { data: 'rep_name', className: 'small', render: function(d) { return d ? escHtml(d) : '—'; } },
+      {
+        data: null, className: 'small',
+        render: function(row) {
+          if (!row.rep_name) return '—';
+          var href = '/rep-payments#rep-' + row.rep_id;
+          return '<a href="' + href + '" class="text-decoration-none" title="View ' + escHtml(row.rep_name) + '\'s income">' +
+                 '<i class="bi bi-person-badge me-1 text-muted" style="font-size:.8rem;"></i>' + escHtml(row.rep_name) + '</a>';
+        }
+      },
       { data: 'amount', className: 'small fw-medium', render: function(d) { return fmtAmount(d); } },
       {
         data: 'status',

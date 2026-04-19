@@ -64,7 +64,7 @@
   const repPaid     = rep.projects.filter(p => p.payment_status === 'Paid').reduce((s, p) => s + (p.payment_amount || 0), 0);
   const repPending  = rep.projects.filter(p => p.payment_status === 'Pending').reduce((s, p) => s + (p.payment_amount || 0), 0);
 %>
-<div class="card border-0 shadow-sm mb-3">
+<div class="card border-0 shadow-sm mb-3" id="rep-<%= rep.rep_id %>">
   <!-- Rep header -->
   <div class="card-header d-flex justify-content-between align-items-center py-2">
     <div class="d-flex align-items-center gap-2">

@@ -52,7 +52,7 @@ exports.data = async (req, res) => {
       { sql: 'SELECT COUNT(*) as cnt FROM projects WHERE project_type = ?', args: [medium] },
       { sql: `SELECT COUNT(*) as cnt ${baseJoin} ${where}`, args: filterParams },
       { sql: `SELECT p.id, p.film_name, p.production_company, p.language, p.start_date, p.end_date,
-              p.amount, p.payment_received, p.status, r.name as rep_name
+              p.amount, p.payment_received, p.status, r.name as rep_name, r.id as rep_id
        ${baseJoin} ${where} ORDER BY ${orderBy} ${orderDir}, p.id DESC LIMIT ? OFFSET ?`,
         args: [...filterParams, length, start] }
     ]);
