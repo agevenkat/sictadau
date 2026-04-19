@@ -221,6 +221,24 @@
       <button class="btn-payment" id="addPaymentBtn">
         <i class="bi bi-plus-lg"></i>Add Payment
       </button>
+      <%
+        const rawPhone = voucher.whatsapp_no || voucher.contact_no || '';
+        const digits = rawPhone.replace(/\D/g, '');
+        let waNum = null;
+        if (digits.length === 10) waNum = '91' + digits;
+        else if (digits.length === 12 && digits.startsWith('91')) waNum = digits;
+        else if (digits.length === 13 && digits.startsWith('091')) waNum = digits.slice(1);
+
+        const waMsg = `Dear ${voucher.full_name},\n\nYour payment of ₹${Number(voucher.final_amount||0).toLocaleString('en-IN')} for the film "${voucher.film_name}" is ready for collection at the SICTADAU Union Office.\n\nMembership No: ${voucher.membership_no}\nFilm: ${voucher.film_name}\nAmount: ₹${Number(voucher.final_amount||0).toLocaleString('en-IN')}\n\nPlease bring your membership card and visit us during office hours (Mon–Sat, 10am–5pm).\n📍 10, Vijayaraghavapuram 4th Street, Saligamam, Chennai–93\n📞 044-23650223\n\n— SICTADAU Management`;
+      %>
+      <% if (waNum) { %>
+        <a href="https://wa.me/<%= waNum %>?text=<%= encodeURIComponent(waMsg) %>"
+           target="_blank"
+           class="btn-back"
+           style="background:#25d366;color:#fff;text-decoration:none;">
+          <i class="bi bi-whatsapp"></i>Notify to Collect
+        </a>
+      <% } %>
     <% } %>
     <a href="javascript:history.back()" class="btn-back"><i class="bi bi-arrow-left"></i>Back</a>
   </div>
@@ -229,7 +247,11 @@
   <div class="header-meta">
     <div>
       Voucher No. <strong><%= voucher.id %></strong>
-      <% if (voucher.paid_on) { %> &nbsp; Paid on : <strong><%= new Date(voucher.paid_on).toLocaleString('en-IN') %></strong><% } %>
+      <% if (voucher.paid_on) {
+           const _ts = String(voucher.paid_on);
+           const _d = new Date(_ts.includes('T') ? _ts : _ts.replace(' ', 'T') + 'Z');
+           const _fmt = _d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+      %> &nbsp; Paid on : <strong><%= _fmt %></strong><% } %>
     </div>
     <div>
       Status: <strong><%= voucher.status %></strong>

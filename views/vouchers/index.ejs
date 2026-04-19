@@ -10,8 +10,9 @@
 
 <div class="card mb-3 border-0 shadow-sm">
   <div class="card-body py-2">
-    <form class="row g-2 align-items-end" method="GET">
-      <div class="col-md-4">
+    <form class="row g-2 align-items-center" method="GET" id="vchrFilterForm">
+      <!-- Row 1: all filter fields — 3+2+3+2+2 = 12 cols -->
+      <div class="col-md-3">
         <input type="text" name="search" class="form-control form-control-sm" placeholder="Search artist, project..." value="<%= search %>">
       </div>
       <div class="col-md-2">
@@ -27,14 +28,54 @@
           <% projects.forEach(p => { %><option value="<%= p.id %>" <%= project_id == p.id ? 'selected' : '' %>><%= p.film_name %></option><% }) %>
         </select>
       </div>
-      <div class="col-auto">
-        <button class="btn btn-sm btn-primary">Filter</button>
-        <a href="/vouchers" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+      <div class="col-md-2">
+        <input type="date" name="from" id="vchrFrom" class="form-control form-control-sm" value="<%= from %>">
+      </div>
+      <div class="col-md-2">
+        <input type="date" name="to" id="vchrTo" class="form-control form-control-sm" value="<%= to %>">
+      </div>
+
+      <!-- Row 2: Filter / Clear + quick date presets on same line -->
+      <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
+        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1"></i>Filter</button>
+        <a href="/vouchers" class="btn btn-sm btn-outline-secondary">Clear</a>
+        <div class="vr" style="height:20px;"></div>
+        <span class="text-muted small">Quick:</span>
+        <div class="btn-group btn-group-sm" role="group">
+          <button type="button" class="btn btn-outline-secondary" onclick="vchrDatePreset('today')">Today</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="vchrDatePreset('week')">This Week</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="vchrDatePreset('month')">This Month</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="vchrDatePreset('lastmonth')">Last Month</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="vchrDatePreset('year')">This Year</button>
+        </div>
       </div>
     </form>
-    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle"></i> Click column headers to sort • Default: Latest first</small>
+    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle"></i> Click column headers to sort &bull; Tick rows to export a selection</small>
   </div>
 </div>
+
+<!-- ── Floating selection action bar ───────────────────────────────────────── -->
+<div id="selectionBar" style="
+  display:none; position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+  z-index:1060; background:#1e293b; color:#fff; border-radius:12px;
+  padding:10px 20px; box-shadow:0 8px 32px rgba(0,0,0,.35);
+  align-items:center; gap:14px; white-space:nowrap;">
+  <span><i class="bi bi-check2-square me-1 text-primary"></i>
+    <strong id="selCount">0</strong> row(s) selected
+  </span>
+  <button id="btnExportSel" class="btn btn-sm btn-success">
+    <i class="bi bi-file-earmark-csv me-1"></i>Export Selected CSV
+  </button>
+  <button id="btnClearSel" class="btn btn-sm btn-outline-light">
+    <i class="bi bi-x-lg me-1"></i>Clear
+  </button>
+</div>
+
+<!-- Hidden form for POST export (avoids URL-length limits with thousands of IDs) -->
+<form id="exportSelForm" action="/vouchers/export-selected" method="POST" style="display:none">
+  <input type="hidden" name="_csrf" value="<%- csrfToken %>">
+  <input type="hidden" name="ids" id="exportIdsInput">
+</form>
 
 <div class="table-card card">
   <div class="card-body p-0">
@@ -42,68 +83,257 @@
       <table id="vouchersTable" class="table table-hover mb-0">
         <thead>
           <tr>
+            <th style="width:36px">
+              <!-- Select-all on current page -->
+              <input type="checkbox" id="chkAll" title="Select / deselect all on this page"
+                style="width:16px;height:16px;cursor:pointer;">
+            </th>
             <th>Date</th>
             <th>Artist Name</th>
             <th>Project Name</th>
-            <th>Account no</th>
+            <th>Account No</th>
             <th>IFSC</th>
             <th>Bank</th>
             <th>Amount</th>
             <th>Status</th>
-            <th>SMS</th>
+            <th>Notify</th>
           </tr>
         </thead>
-        <tbody>
-          <% vouchers.forEach(v => { %>
-          <tr>
-            <td class="small text-muted"><%= new Date(v.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) %></td>
-            <td>
-              <a href="/members/<%= v.member_id %>" class="fw-medium text-decoration-none text-primary">
-                (<%= v.membership_no %>) <%= v.full_name %>
-              </a>
-            </td>
-            <td>
-              <a href="/projects/<%= v.project_id %>" class="text-decoration-none text-muted small">
-                <%= v.film_name %>
-              </a>
-            </td>
-            <td class="small text-muted"><%= v.bank_account_no || '—' %></td>
-            <td class="small text-muted"><%= v.ifsc_code || '—' %></td>
-            <td class="small text-muted"><%= v.bank_name || '—' %></td>
-            <td class="small fw-medium">Rs. <%= (v.final_amount||0).toLocaleString('en-IN') %></td>
-            <td>
-              <% if (v.status === 'Pending') { %>
-                <form action="/vouchers/<%= v.id %>/pay" method="POST" class="d-inline">
-                  <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-                  <input type="hidden" name="payment_method" value="NEFT">
-                  <button class="btn btn-success btn-sm">Pay Now</button>
-                </form>
-              <% } else { %>
-                <span class="badge badge-paid">Paid</span>
-              <% } %>
-            </td>
-            <td>
-              <a href="/vouchers/<%= v.id %>/show" class="btn btn-sm btn-outline-secondary" target="_blank" title="View Slip">
-                <i class="bi bi-eye"></i>
-              </a>
-            </td>
-          </tr>
-          <% }) %>
-        </tbody>
+        <tbody></tbody>
       </table>
     </div>
   </div>
 </div>
 
 <script>
-$(function(){
-  initDataTable('#vouchersTable', {
-    order: [[0, 'desc']],
-    columnDefs: [
-      { orderable: false, targets: [7, 8] },
-      { responsivePriority: 1, targets: [1, 7] },
-      { responsivePriority: 2, targets: [6] }
-    ]
+function vchrDatePreset(preset) {
+  // Use local date parts — avoids UTC midnight shift in IST (+5:30)
+  function fmtLocal(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+  var now = new Date();
+  var from, to = fmtLocal(now);
+  if (preset === 'today') {
+    from = fmtLocal(now);
+  } else if (preset === 'week') {
+    var dow = now.getDay() || 7; // Mon=1 … Sun=7
+    var mon = new Date(now); mon.setDate(now.getDate() - (dow - 1));
+    from = fmtLocal(mon);
+  } else if (preset === 'month') {
+    from = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+  } else if (preset === 'lastmonth') {
+    from = fmtLocal(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    to   = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 0));
+  } else if (preset === 'year') {
+    from = fmtLocal(new Date(now.getFullYear(), 0, 1));
+  }
+  document.getElementById('vchrFrom').value = from;
+  document.getElementById('vchrTo').value   = to;
+  document.getElementById('vchrFilterForm').submit();
+}
+
+(function(){
+  const SEARCH     = <%- JSON.stringify(search) %>;
+  const STATUS     = <%- JSON.stringify(status) %>;
+  const PROJECT_ID = <%- JSON.stringify(project_id) %>;
+  const FROM       = <%- JSON.stringify(from) %>;
+  const TO         = <%- JSON.stringify(to) %>;
+  const CSRF       = <%- JSON.stringify(csrfToken) %>;
+
+  // ── Tracks selected voucher IDs across all pages ──────────────────────────
+  const selectedIds = new Set();
+
+  function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Normalise a phone number to E.164 (91XXXXXXXXXX) for wa.me
+  function waPhone(num) {
+    if (!num) return null;
+    var digits = String(num).replace(/\D/g, '');
+    if (digits.length === 10) return '91' + digits;
+    if (digits.length === 12 && digits.startsWith('91')) return digits;
+    if (digits.length === 13 && digits.startsWith('091')) return digits.slice(1);
+    return digits.length >= 10 ? digits : null;
+  }
+
+  // ── Selection UI helpers ──────────────────────────────────────────────────
+  function updateSelectionBar() {
+    const n = selectedIds.size;
+    document.getElementById('selCount').textContent = n;
+    const bar = document.getElementById('selectionBar');
+    bar.style.display = n > 0 ? 'flex' : 'none';
+    // Sync header checkbox state
+    const boxes = document.querySelectorAll('.row-chk');
+    const checkedOnPage = [...boxes].filter(b => b.checked).length;
+    const hdr = document.getElementById('chkAll');
+    hdr.checked = boxes.length > 0 && checkedOnPage === boxes.length;
+    hdr.indeterminate = checkedOnPage > 0 && checkedOnPage < boxes.length;
+  }
+
+  // ── DataTable ─────────────────────────────────────────────────────────────
+  const table = $('#vouchersTable').DataTable({
+    serverSide: true,
+    processing: true,
+    searching: false,
+    ajax: {
+      url: '/vouchers/data',
+      data: function(d) {
+        d.search.value = SEARCH;
+        d.status       = STATUS;
+        d.project_id   = PROJECT_ID;
+        d.from         = FROM;
+        d.to           = TO;
+      }
+    },
+    columns: [
+      // ── col 0: checkbox (not orderable, not part of server sort) ──
+      {
+        data: null, orderable: false, className: 'dt-center',
+        render: function(row) {
+          const chk = selectedIds.has(row.id) ? 'checked' : '';
+          return '<input type="checkbox" class="row-chk" data-id="' + row.id + '" ' + chk +
+                 ' style="width:16px;height:16px;cursor:pointer;">';
+        }
+      },
+      // ── col 1: date ──
+      { data: 'created_at_f', className: 'small text-muted', defaultContent: '—' },
+      // ── col 2: artist ──
+      {
+        data: null, render: function(row) {
+          return '<a href="/members/' + row.member_id + '" class="fw-medium text-decoration-none text-primary">' +
+            '(' + escHtml(row.membership_no||'') + ') ' + escHtml(row.full_name||'') + '</a>';
+        }
+      },
+      // ── col 3: project ──
+      {
+        data: null, render: function(row) {
+          return '<a href="/projects/' + row.project_id + '" class="text-decoration-none text-muted small">' +
+            escHtml(row.film_name||'') + '</a>';
+        }
+      },
+      { data: 'bank_account_no', className: 'small text-muted', render: function(d) { return d || '—'; } },
+      { data: 'ifsc_code',       className: 'small text-muted', render: function(d) { return d || '—'; } },
+      { data: 'bank_name',       className: 'small text-muted', render: function(d) { return d ? escHtml(d) : '—'; } },
+      {
+        data: 'final_amount', className: 'small fw-medium',
+        render: function(d) { return 'Rs. ' + (Number(d)||0).toLocaleString('en-IN'); }
+      },
+      {
+        data: null, orderable: false,
+        render: function(row) {
+          if (row.status === 'Pending') {
+            return '<form action="/vouchers/' + row.id + '/pay" method="POST" class="d-inline">' +
+              '<input type="hidden" name="_csrf" value="' + escHtml(CSRF) + '">' +
+              '<input type="hidden" name="payment_method" value="Cash">' +
+              '<button class="btn btn-success btn-sm">Pay Now</button></form>';
+          }
+          return '<span class="badge badge-paid">Paid</span>';
+        }
+      },
+      {
+        data: null, orderable: false,
+        render: function(row) {
+          var btns = '<a href="/vouchers/' + row.id + '/show" class="btn btn-sm btn-outline-secondary me-1" target="_blank" title="View Slip"><i class="bi bi-eye"></i></a>';
+          if (row.status === 'Pending') {
+            var phone = waPhone(row.whatsapp_no || row.contact_no);
+            if (phone) {
+              var msg = 'Dear ' + (row.full_name || '') + ',\n\nYour payment of \u20b9' +
+                Number(row.final_amount || 0).toLocaleString('en-IN') +
+                ' for the film \u201c' + (row.film_name || '') + '\u201d is ready for collection at the SICTADAU Union Office.\n\n' +
+                'Membership No: ' + (row.membership_no || '') + '\n' +
+                'Film: ' + (row.film_name || '') + '\n' +
+                'Amount: \u20b9' + Number(row.final_amount || 0).toLocaleString('en-IN') + '\n\n' +
+                'Please bring your membership card and visit us during office hours (Mon\u2013Sat, 10am\u20135pm).\n' +
+                '\ud83d\udccd 10, Vijayaraghavapuram 4th Street, Saligamam, Chennai\u201393\n' +
+                '\ud83d\udcde 044-23650223\n\n\u2014 SICTADAU Management';
+              btns += '<a href="https://wa.me/' + phone + '?text=' + encodeURIComponent(msg) +
+                '" class="btn btn-sm btn-success" target="_blank" title="Send WhatsApp: Collect Payment">' +
+                '<i class="bi bi-whatsapp"></i></a>';
+            }
+          }
+          return btns;
+        }
+      }
+    ],
+    order: [[1, 'desc']],   // col 1 = Date (col 0 is checkbox)
+    pageLength: 25,
+    lengthMenu: [[25, 50, 100], ['25', '50', '100']],
+    pagingType: 'simple_numbers',
+    dom: "<'row mb-2'<'col-sm-12 col-md-6'B><'col-sm-6 col-md-6'l>>" +
+         "<'row'<'col-sm-12'tr>>" +
+         "<'row mt-2 align-items-center'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7 d-flex justify-content-end'p>>",
+    buttons: [
+      {
+        text: '<i class="bi bi-file-earmark-csv me-1"></i>Export All (filtered)',
+        className: 'btn btn-sm btn-outline-secondary',
+        action: function() {
+          window.location.href = '/vouchers/export?' +
+            new URLSearchParams({search: SEARCH, status: STATUS, project_id: PROJECT_ID, from: FROM, to: TO}).toString();
+        }
+      }
+    ],
+    language: {
+      processing: '<span class="spinner-border spinner-border-sm text-primary me-1" role="status"></span> Loading...',
+      lengthMenu: '_MENU_ per page',
+      info: 'Showing _START_–_END_ of _TOTAL_',
+      infoEmpty: 'No records found',
+      infoFiltered: '(filtered)',
+      paginate: { first: '«', last: '»', next: '›', previous: '‹' }
+    },
+    // Re-apply checkbox state after every page draw
+    drawCallback: function() {
+      updateSelectionBar();
+    }
   });
-});
+
+  // ── Row checkbox click ────────────────────────────────────────────────────
+  $('#vouchersTable tbody').on('change', '.row-chk', function() {
+    const id = parseInt(this.dataset.id);
+    if (this.checked) selectedIds.add(id);
+    else              selectedIds.delete(id);
+    updateSelectionBar();
+  });
+
+  // ── Click anywhere on the row also toggles the checkbox ──────────────────
+  $('#vouchersTable tbody').on('click', 'tr', function(e) {
+    // Don't toggle if clicking a link/button/checkbox directly
+    if (e.target.closest('a,button,form,input')) return;
+    const chk = this.querySelector('.row-chk');
+    if (!chk) return;
+    chk.checked = !chk.checked;
+    chk.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  // ── Select-all on current page ────────────────────────────────────────────
+  document.getElementById('chkAll').addEventListener('change', function() {
+    document.querySelectorAll('.row-chk').forEach(function(chk) {
+      chk.checked = this.checked;
+      const id = parseInt(chk.dataset.id);
+      if (this.checked) selectedIds.add(id);
+      else              selectedIds.delete(id);
+    }, this);
+    updateSelectionBar();
+  });
+
+  // ── Export selected ───────────────────────────────────────────────────────
+  document.getElementById('btnExportSel').addEventListener('click', function() {
+    if (selectedIds.size === 0) return;
+    document.getElementById('exportIdsInput').value = JSON.stringify([...selectedIds]);
+    document.getElementById('exportSelForm').submit();
+  });
+
+  // ── Clear selection ───────────────────────────────────────────────────────
+  document.getElementById('btnClearSel').addEventListener('click', function() {
+    selectedIds.clear();
+    document.querySelectorAll('.row-chk').forEach(function(chk) { chk.checked = false; });
+    document.getElementById('chkAll').checked = false;
+    document.getElementById('chkAll').indeterminate = false;
+    updateSelectionBar();
+  });
+
+})();
 </script>

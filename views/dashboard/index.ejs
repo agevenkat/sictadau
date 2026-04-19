@@ -1,11 +1,14 @@
-<% activePage = 'dashboard'; %>
+<% activePage = 'dashboard'; pageScripts = '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"><\/script>'; %>
 
-<!-- Stat cards -->
+<!-- ── KPI row ──────────────────────────────────────── -->
 <div class="row g-3 mb-4">
-  <div class="col-6 col-lg-3">
-    <div class="card stat-card h-100">
+
+  <div class="col-6 col-xl-3">
+    <div class="stat-card card-accent">
       <div class="card-body d-flex align-items-center gap-3">
-        <div class="icon-box" style="background:#dbeafe;color:#1d4ed8"><i class="bi bi-people-fill"></i></div>
+        <div class="icon-box" style="background:#dbeafe;">
+          <i class="bi bi-people-fill" style="color:#1d4ed8;"></i>
+        </div>
         <div>
           <div class="stat-value"><%= members.active || 0 %></div>
           <div class="stat-label">Active Members</div>
@@ -13,10 +16,13 @@
       </div>
     </div>
   </div>
-  <div class="col-6 col-lg-3">
-    <div class="card stat-card h-100">
+
+  <div class="col-6 col-xl-3">
+    <div class="stat-card card-accent accent-amber">
       <div class="card-body d-flex align-items-center gap-3">
-        <div class="icon-box" style="background:#fef3c7;color:#d97706"><i class="bi bi-receipt"></i></div>
+        <div class="icon-box" style="background:#fef3c7;">
+          <i class="bi bi-receipt" style="color:#d97706;"></i>
+        </div>
         <div>
           <div class="stat-value"><%= vouchers.pending || 0 %></div>
           <div class="stat-label">Pending Vouchers</div>
@@ -24,104 +30,272 @@
       </div>
     </div>
   </div>
-  <div class="col-6 col-lg-3">
-    <div class="card stat-card h-100">
+
+  <div class="col-6 col-xl-3">
+    <div class="stat-card card-accent accent-green">
       <div class="card-body d-flex align-items-center gap-3">
-        <div class="icon-box" style="background:#dcfce7;color:#16a34a"><i class="bi bi-currency-rupee"></i></div>
+        <div class="icon-box" style="background:#dcfce7;">
+          <i class="bi bi-currency-rupee" style="color:#16a34a;"></i>
+        </div>
         <div>
-          <div class="stat-value">₹<%= Math.round(vouchers.paid_amount || 0).toLocaleString('en-IN') %></div>
+          <div class="stat-value" style="font-size:1.5rem;">₹<%= Math.round(vouchers.paid_amount || 0).toLocaleString('en-IN') %></div>
           <div class="stat-label">Disbursed</div>
         </div>
       </div>
     </div>
   </div>
-  <div class="col-6 col-lg-3">
-    <div class="card stat-card h-100">
+
+  <div class="col-6 col-xl-3">
+    <div class="stat-card card-accent <%= balance >= 0 ? 'accent-green' : 'accent-red' %>">
       <div class="card-body d-flex align-items-center gap-3">
-        <div class="icon-box" style="background:<%= balance >= 0 ? '#dcfce7' : '#fee2e2' %>;color:<%= balance >= 0 ? '#16a34a' : '#dc2626' %>">
-          <i class="bi bi-bank"></i>
+        <div class="icon-box" style="background:<%= balance >= 0 ? '#dcfce7' : '#fee2e2' %>;">
+          <i class="bi bi-bank" style="color:<%= balance >= 0 ? '#16a34a' : '#dc2626' %>;"></i>
         </div>
         <div>
-          <div class="stat-value">₹<%= Math.round(Math.abs(balance)).toLocaleString('en-IN') %></div>
-          <div class="stat-label">Balance (<%= balance >= 0 ? 'Credit' : 'Deficit' %>)</div>
+          <div class="stat-value" style="font-size:1.5rem;color:<%= balance >= 0 ? '#15803d' : '#dc2626' %>;">
+            ₹<%= Math.round(Math.abs(balance)).toLocaleString('en-IN') %>
+          </div>
+          <div class="stat-label"><%= balance >= 0 ? 'Balance (Credit)' : 'Balance (Deficit)' %></div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Overview cards -->
+<!-- ── Summary tiles ─────────────────────────────────── -->
 <div class="row g-3 mb-4">
+
+  <!-- Members -->
   <div class="col-md-4">
-    <div class="card stat-card h-100">
+    <div class="card h-100">
+      <div class="card-header">
+        <span><i class="bi bi-people-fill text-primary me-2"></i>Members Overview</span>
+        <a href="/members" class="btn btn-sm btn-outline-primary">View All</a>
+      </div>
       <div class="card-body">
-        <h6 class="text-muted mb-3" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Members</h6>
-        <% [['Total', members.total, ''], ['Active', members.active, 'text-success'], ['Expired', members.expired, 'text-warning'], ['Cancelled', members.cancelled, 'text-danger']].forEach(([label, val, cls]) => { %>
-        <div class="d-flex justify-content-between mb-2">
-          <span class="small <%= cls %>"><%= label %></span>
-          <strong class="<%= cls %>"><%= val || 0 %></strong>
+        <% [
+          ['Total Members',  members.total,     '#1e293b', ''],
+          ['Active',         members.active,    '#15803d', 'bi-check-circle-fill'],
+          ['Expired',        members.expired,   '#d97706', 'bi-clock-fill'],
+          ['Cancelled',      members.cancelled, '#dc2626', 'bi-x-circle-fill']
+        ].forEach(([label, val, color, icon]) => { %>
+        <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+          <span style="font-size:.9rem;font-weight:500;color:#475569;">
+            <% if(icon) { %><i class="bi <%= icon %> me-2" style="color:<%= color %>;"></i><% } %><%= label %>
+          </span>
+          <strong style="font-size:1rem;color:<%= color %>;"><%= val || 0 %></strong>
         </div>
         <% }) %>
-        <a href="/members" class="btn btn-sm btn-outline-primary w-100 mt-2">View Members</a>
       </div>
     </div>
   </div>
+
+  <!-- Projects -->
   <div class="col-md-4">
-    <div class="card stat-card h-100">
+    <div class="card h-100">
+      <div class="card-header">
+        <span><i class="bi bi-file-earmark-text text-primary me-2"></i>Projects Overview</span>
+        <a href="/projects" class="btn btn-sm btn-outline-primary">View All</a>
+      </div>
       <div class="card-body">
-        <h6 class="text-muted mb-3" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Projects</h6>
-        <% [['Total', projects.total, ''], ['Pending', projects.pending, 'text-warning'], ['Paid', projects.paid, 'text-success'], ['Total Billed', '₹' + Math.round(projects.total_amount||0).toLocaleString('en-IN'), '']].forEach(([label, val, cls]) => { %>
-        <div class="d-flex justify-content-between mb-2">
-          <span class="small <%= cls %>"><%= label %></span>
-          <strong class="<%= cls %>"><%= val || 0 %></strong>
+        <% [
+          ['Total Projects',  projects.total,    '#1e293b', ''],
+          ['Pending',         projects.pending,  '#d97706', 'bi-hourglass-split'],
+          ['Paid',            projects.paid,     '#15803d', 'bi-check-circle-fill'],
+          ['Total Billed',    '₹' + Math.round(projects.total_amount||0).toLocaleString('en-IN'), '#1d4ed8', 'bi-currency-rupee']
+        ].forEach(([label, val, color, icon]) => { %>
+        <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+          <span style="font-size:.9rem;font-weight:500;color:#475569;">
+            <% if(icon) { %><i class="bi <%= icon %> me-2" style="color:<%= color %>;"></i><% } %><%= label %>
+          </span>
+          <strong style="font-size:1rem;color:<%= color %>;"><%= val || 0 %></strong>
         </div>
         <% }) %>
-        <a href="/projects" class="btn btn-sm btn-outline-primary w-100 mt-2">View Projects</a>
       </div>
     </div>
   </div>
+
+  <!-- Vouchers -->
   <div class="col-md-4">
-    <div class="card stat-card h-100">
+    <div class="card h-100">
+      <div class="card-header">
+        <span><i class="bi bi-receipt text-primary me-2"></i>Vouchers Overview</span>
+        <a href="/vouchers" class="btn btn-sm btn-outline-primary">View All</a>
+      </div>
       <div class="card-body">
-        <h6 class="text-muted mb-3" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Vouchers</h6>
-        <% [['Total', vouchers.total, ''], ['Pending', vouchers.pending, 'text-warning'], ['Paid', vouchers.paid, 'text-success'], ['Pending Amt', '₹' + Math.round(vouchers.pending_amount||0).toLocaleString('en-IN'), 'text-warning']].forEach(([label, val, cls]) => { %>
-        <div class="d-flex justify-content-between mb-2">
-          <span class="small <%= cls %>"><%= label %></span>
-          <strong class="<%= cls %>"><%= val || 0 %></strong>
+        <% [
+          ['Total Vouchers', vouchers.total,          '#1e293b', ''],
+          ['Pending',        vouchers.pending,        '#d97706', 'bi-hourglass-split'],
+          ['Paid',           vouchers.paid,           '#15803d', 'bi-check-circle-fill'],
+          ['Pending Amount', '₹' + Math.round(vouchers.pending_amount||0).toLocaleString('en-IN'), '#dc2626', 'bi-currency-rupee']
+        ].forEach(([label, val, color, icon]) => { %>
+        <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+          <span style="font-size:.9rem;font-weight:500;color:#475569;">
+            <% if(icon) { %><i class="bi <%= icon %> me-2" style="color:<%= color %>;"></i><% } %><%= label %>
+          </span>
+          <strong style="font-size:1rem;color:<%= color %>;"><%= val || 0 %></strong>
         </div>
         <% }) %>
-        <a href="/vouchers" class="btn btn-sm btn-outline-primary w-100 mt-2">View Vouchers</a>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Tables -->
+<!-- ── Charts ──────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+  <!-- Monthly Voucher Disbursement -->
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header">
+        <span><i class="bi bi-bar-chart-fill text-primary me-2"></i>Monthly Disbursements (last 12 months)</span>
+      </div>
+      <div class="card-body" style="position:relative;height:260px;">
+        <canvas id="chartDisbursement"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Voucher Status Donut -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <span><i class="bi bi-pie-chart-fill text-primary me-2"></i>Voucher Status</span>
+      </div>
+      <div class="card-body d-flex flex-column align-items-center justify-content-center" style="position:relative;height:260px;">
+        <canvas id="chartStatus" style="max-width:200px;max-height:200px;"></canvas>
+        <div class="mt-2 small text-muted text-center">
+          <span class="me-3"><span style="color:#16a34a;">●</span> Paid: ₹<%= Math.round(vouchers.total_disbursed||0).toLocaleString('en-IN') %></span>
+          <span><span style="color:#f59e0b;">●</span> Pending: ₹<%= Math.round(vouchers.pending_amount||0).toLocaleString('en-IN') %></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  // ── Disbursement bar chart ──────────────────────────────
+  const mvData = <%- JSON.stringify(monthlyVouchers) %>;
+  const labels = mvData.map(function(r) {
+    const parts = r.month ? r.month.split('-') : ['',''];
+    const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return (mon[parseInt(parts[1],10)-1]||'') + ' ' + (parts[0]||'');
+  });
+  new Chart(document.getElementById('chartDisbursement'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Paid (₹)',
+          data: mvData.map(function(r){ return Math.round(r.paid_amount||0); }),
+          backgroundColor: 'rgba(22,163,74,0.75)',
+          borderRadius: 4
+        },
+        {
+          label: 'Pending (₹)',
+          data: mvData.map(function(r){ return Math.round(r.pending_amount||0); }),
+          backgroundColor: 'rgba(245,158,11,0.6)',
+          borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+      scales: {
+        y: {
+          ticks: {
+            callback: function(v) {
+              if (v >= 1e6) return '₹' + (v/1e6).toFixed(1) + 'L';
+              if (v >= 1e3) return '₹' + (v/1e3).toFixed(0) + 'K';
+              return '₹' + v;
+            },
+            font: { size: 10 }
+          },
+          grid: { color: 'rgba(0,0,0,.06)' }
+        },
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  // ── Status donut chart ──────────────────────────────────
+  new Chart(document.getElementById('chartStatus'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Paid', 'Pending'],
+      datasets: [{
+        data: [
+          Math.round(<%= vouchers.total_disbursed || 0 %>),
+          Math.round(<%= vouchers.pending_amount || 0 %>)
+        ],
+        backgroundColor: ['rgba(22,163,74,0.8)', 'rgba(245,158,11,0.8)'],
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const v = ctx.raw;
+              return ' ₹' + v.toLocaleString('en-IN');
+            }
+          }
+        }
+      },
+      cutout: '65%'
+    }
+  });
+})();
+</script>
+
+<!-- ── Activity tables ──────────────────────────────── -->
 <div class="row g-3">
-  <div class="col-md-6">
+
+  <!-- Pending payments -->
+  <div class="col-lg-6">
     <div class="table-card card">
-      <div class="card-header d-flex justify-content-between align-items-center py-2">
-        <span class="fw-semibold"><i class="bi bi-clock text-warning me-2"></i>Pending Payments</span>
+      <div class="card-header">
+        <span><i class="bi bi-clock-fill text-warning me-2"></i>Pending Payments</span>
         <a href="/vouchers?status=Pending" class="btn btn-sm btn-outline-primary">View All</a>
       </div>
       <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-          <thead><tr><th>#</th><th>Artist</th><th>Project</th><th>Amount</th><th></th></tr></thead>
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Artist</th>
+              <th>Project</th>
+              <th>Amount</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
-            <% if (pendingVouchers.length === 0) { %>
-              <tr><td colspan="5" class="text-center text-muted py-3 small">No pending payments</td></tr>
+            <% if (!pendingVouchers || pendingVouchers.length === 0) { %>
+              <tr>
+                <td colspan="5" class="text-center py-4 text-muted">
+                  <i class="bi bi-check-circle-fill text-success d-block mb-1" style="font-size:1.5rem;"></i>
+                  All payments cleared
+                </td>
+              </tr>
             <% } else { %>
               <% pendingVouchers.forEach(v => { %>
               <tr>
-                <td class="text-muted small"><%= v.id %></td>
-                <td class="small"><%= v.full_name %></td>
-                <td class="small text-muted"><%= v.film_name %></td>
-                <td class="small fw-medium">₹<%= (v.final_amount||0).toLocaleString('en-IN') %></td>
+                <td class="text-muted" style="font-size:.82rem;font-weight:600;">#<%= v.id %></td>
+                <td style="font-weight:600;color:#1e293b;font-size:.9rem;"><%= v.full_name %></td>
+                <td style="color:#475569;font-size:.85rem;"><%= v.film_name %></td>
+                <td style="font-weight:700;color:#1d4ed8;font-size:.9rem;">₹<%= (v.final_amount||0).toLocaleString('en-IN') %></td>
                 <td>
                   <form action="/vouchers/<%= v.id %>/pay" method="POST" class="d-inline">
                     <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-                    <input type="hidden" name="payment_method" value="NEFT">
-                    <button class="btn btn-success" style="font-size:0.7rem;padding:2px 8px;">Pay</button>
+                    <input type="hidden" name="payment_method" value="Cash">
+                    <button class="btn btn-xs btn-success">Pay</button>
                   </form>
                 </td>
               </tr>
@@ -133,27 +307,39 @@
     </div>
   </div>
 
-  <div class="col-md-6">
+  <!-- Recent projects -->
+  <div class="col-lg-6">
     <div class="table-card card">
-      <div class="card-header d-flex justify-content-between align-items-center py-2">
-        <span class="fw-semibold"><i class="bi bi-file-earmark-text text-primary me-2"></i>Recent Projects</span>
+      <div class="card-header">
+        <span><i class="bi bi-film text-primary me-2"></i>Recent Projects</span>
         <a href="/projects" class="btn btn-sm btn-outline-primary">View All</a>
       </div>
       <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-          <thead><tr><th>Film</th><th>Company</th><th>Amount</th><th>Status</th></tr></thead>
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr><th>Film</th><th>Company</th><th>Amount</th><th>Status</th></tr>
+          </thead>
           <tbody>
-            <% recentProjects.forEach(p => { %>
-            <tr>
-              <td><a href="/projects/<%= p.id %>" class="text-decoration-none small fw-medium"><%= p.film_name %></a></td>
-              <td class="small text-muted"><%= p.production_company %></td>
-              <td class="small">₹<%= (p.amount||0).toLocaleString('en-IN') %></td>
-              <td><span class="badge badge-<%= p.status.toLowerCase() %>"><%= p.status %></span></td>
-            </tr>
-            <% }) %>
+            <% if (!recentProjects || recentProjects.length === 0) { %>
+              <tr><td colspan="4" class="text-center py-4 text-muted">No recent projects</td></tr>
+            <% } else { %>
+              <% recentProjects.forEach(p => { %>
+              <tr>
+                <td>
+                  <a href="/projects/<%= p.id %>" class="fw-semibold" style="color:#1e293b;font-size:.9rem;">
+                    <%= p.film_name %>
+                  </a>
+                </td>
+                <td style="color:#475569;font-size:.85rem;"><%= p.production_company %></td>
+                <td style="font-weight:700;color:#1d4ed8;font-size:.85rem;">₹<%= (p.amount||0).toLocaleString('en-IN') %></td>
+                <td><span class="badge badge-<%= p.status.toLowerCase() %>"><%= p.status %></span></td>
+              </tr>
+              <% }) %>
+            <% } %>
           </tbody>
         </table>
       </div>
     </div>
   </div>
+
 </div>
