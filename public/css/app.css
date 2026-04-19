@@ -956,9 +956,25 @@ footer {
    PRINT
    ===================================================== */
 @media print {
-  .no-print, .sidebar, .topbar, .filter-bar { display: none !important; }
-  body { background: #fff; font-size: 12px; }
-  .card { box-shadow: none; border: 1px solid #ddd; }
+  /* hide chrome */
+  .no-print, .sidebar, .topbar, .filter-bar,
+  .actions, .btn, .modal { display: none !important; }
+
+  /* Bootstrap print utilities — must be explicit to override d-none */
+  .d-print-none  { display: none !important; }
+  .d-print-block { display: block !important; }
+  .d-none        { display: none !important; }
+
+  /* unlock layout constraints so content can flow across pages */
+  html, body { background: #fff !important; height: auto !important; overflow: visible !important; }
+  .wrapper       { display: block !important; min-height: auto !important; height: auto !important; }
+  .main-content  { margin: 0 !important; padding: 0 !important; min-height: auto !important;
+                   height: auto !important; overflow: visible !important; }
+  .topbar        { display: none !important; }
+
+  /* card / typography cleanup */
+  .card { box-shadow: none !important; border: 1px solid #ddd !important; }
+  body { font-size: 12px; }
 }
 
 /* =====================================================
