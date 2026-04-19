@@ -22,22 +22,12 @@
       <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-printer me-1"></i>Print
       </button>
-      <a href="/projects/<%= project.id %>/invoice" class="btn btn-sm btn-outline-info" target="_blank">
+      <a href="/projects/<%= project.id %>/invoice" class="btn btn-sm btn-outline-secondary" target="_blank">
         <i class="bi bi-file-earmark-text me-1"></i>View Work Report
       </a>
       <a href="/projects/<%= project.id %>/download-invoice" class="btn btn-sm btn-outline-danger">
         <i class="bi bi-file-earmark-pdf me-1"></i>PDF
       </a>
-      <% if (currentUser && ['admin','superadmin'].includes(currentUser.role)) { %>
-      <form action="/projects/<%= project.id %>" method="POST" class="d-inline"
-            onsubmit="return confirm('Delete this project permanently?')">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="_method" value="DELETE">
-        <button type="submit" class="btn btn-sm btn-outline-danger">
-          <i class="bi bi-trash me-1"></i>Delete
-        </button>
-      </form>
-      <% } %>
     </div>
   </div>
 
