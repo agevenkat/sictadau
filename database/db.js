@@ -1,93 +1,93 @@
-const { DatabaseSync } = require('node:sqlite');
+const { createClient } = require('@libsql/client');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config();
 
-// On Vercel (serverless), only /tmp is writable.
-// Always use a fresh DB at /tmp — schema + seed runs on every cold start.
-const IS_VERCEL = process.env.VERCEL === '1';
+let client;
 
-function resolveDbPath() {
-  if (IS_VERCEL) {
-    // On Vercel only /tmp is writable — ignore relative DATABASE_PATH env vars.
-    // Accept DATABASE_PATH only if it explicitly starts with /tmp/.
-    const envPath = process.env.DATABASE_PATH;
-    const tmpDb = (envPath && envPath.startsWith('/tmp/')) ? envPath : '/tmp/sictadau.db';
-    // Remove any stale/corrupt files from a previous run (including WAL/SHM)
-    for (const f of [tmpDb, tmpDb + '-wal', tmpDb + '-shm', tmpDb + '-journal']) {
-      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (_) {}
+if (process.env.TURSO_DATABASE_URL) {
+  client = createClient({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN || '',
+  });
+  console.log('DB: Turso at', process.env.TURSO_DATABASE_URL);
+} else {
+  // On Vercel without Turso, fall back to /tmp (ephemeral but writable).
+  // For local dev, use ./database/sictadau.db.
+  const IS_VERCEL = process.env.VERCEL === '1';
+  const dbPath = IS_VERCEL
+    ? '/tmp/sictadau.db'
+    : (process.env.DATABASE_PATH || path.join(__dirname, 'sictadau.db'));
+  client = createClient({ url: `file:${dbPath}` });
+  console.log('DB: local SQLite at', dbPath);
+}
+
+async function initDb() {
+  try {
+    await client.execute('PRAGMA foreign_keys = ON');
+  } catch (_) {}
+  const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
+  const stmts = schema.split(';').map(s => s.trim()).filter(Boolean);
+  for (const stmt of stmts) {
+    try {
+      await client.execute(stmt);
+    } catch (e) {
+      const msg = String(e.message);
+      if (!msg.includes('already exists') && !msg.includes('duplicate column name')) {
+        console.error('Schema stmt error:', e.message, '|', stmt.substring(0, 60));
+      }
     }
-    console.log('Vercel: using fresh DB at', tmpDb);
-    return tmpDb;
   }
-
-  if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH;
-  return path.join(__dirname, 'sictadau.db');
+  console.log('DB: schema ready');
 }
 
-const DB_PATH = resolveDbPath();
-const dbDir = path.dirname(DB_PATH);
+const ready = initDb().catch(e => {
+  console.error('DB init failed:', e.message);
+  throw e;
+});
 
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
-
-console.log('Opening SQLite at:', DB_PATH);
-const db = new DatabaseSync(DB_PATH);
-console.log('SQLite opened OK');
-
-// Vercel Lambda may not support WAL mode (requires shared memory file locking).
-// Use DELETE journal mode instead — simpler, works everywhere.
-if (!IS_VERCEL) {
-  db.exec('PRAGMA journal_mode = WAL');
-  db.exec('PRAGMA busy_timeout = 5000');
-}
-db.exec('PRAGMA foreign_keys = ON');
-
-// Run schema
-const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-db.exec(schema);
-
-// Wrap db to match better-sqlite3 API used throughout the app
-// node:sqlite uses different method names, so we add a compatibility layer
-
-const originalPrepare = db.prepare.bind(db);
-
-db.prepare = function(sql) {
-  const stmt = originalPrepare(sql);
-
+function prepare(sql) {
   return {
-    get: (...params) => {
-      try {
-        return stmt.get(...params) || null;
-      } catch (err) {
-        console.error('DB.get error:', err.message, 'SQL:', sql);
-        throw err;
-      }
+    get: async (...params) => {
+      const args = params.flat();
+      const result = await client.execute({ sql, args });
+      const row = result.rows[0];
+      return row ? { ...row } : null;
     },
-    all: (...params) => {
-      try {
-        return stmt.all(...params) || [];
-      } catch (err) {
-        console.error('DB.all error:', err.message, 'SQL:', sql);
-        throw err;
-      }
+    all: async (...params) => {
+      const args = params.flat();
+      const result = await client.execute({ sql, args });
+      return result.rows.map(row => ({ ...row }));
     },
-    run: (...params) => {
-      try {
-        const result = stmt.run(...params);
-        // Ensure lastInsertRowid property exists for INSERT operations
-        return {
-          changes: result.changes || 0,
-          lastInsertRowid: result.lastInsertRowid || 0,
-          ...result
-        };
-      } catch (err) {
-        console.error('DB.run error:', err.message, 'SQL:', sql);
-        throw err;
-      }
-    },
+    run: async (...params) => {
+      const args = params.flat();
+      const result = await client.execute({ sql, args });
+      return {
+        changes: result.rowsAffected,
+        lastInsertRowid: Number(result.lastInsertRowid ?? 0)
+      };
+    }
   };
-};
+}
 
-module.exports = db;
+async function exec(sql) {
+  const stmts = sql.split(';').map(s => s.trim()).filter(Boolean);
+  for (const stmt of stmts) {
+    await client.execute(stmt);
+  }
+}
+
+// Run multiple queries in a single Turso network round-trip.
+// queries: array of { sql, args } or plain SQL strings (no args).
+// Returns array of result sets; each has .rows (spread to plain objects) and .first().
+async function batch(queries, mode = 'read') {
+  const stmts = queries.map(q =>
+    typeof q === 'string' ? { sql: q, args: [] } : { sql: q.sql, args: q.args ?? [] }
+  );
+  const results = await client.batch(stmts, mode);
+  return results.map(r => ({
+    rows: r.rows.map(row => ({ ...row })),
+    first: () => r.rows[0] ? { ...r.rows[0] } : null
+  }));
+}
+
+module.exports = { prepare, exec, batch, ready, client };

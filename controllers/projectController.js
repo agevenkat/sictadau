@@ -5,34 +5,94 @@ const fs = require('fs');
 const LANGUAGES = ['Tamil', 'Telugu', 'Malayalam', 'Kannada', 'Hindi', 'English'];
 const STATUSES = ['Pending', 'Completed', 'Paid'];
 
-exports.index = (req, res) => {
+exports.index = async (req, res) => {
+  await db.ready;
   const search = req.query.search || '';
   const status = req.query.status || '';
-  let query = `SELECT p.*, r.name as rep_name FROM projects p
-               LEFT JOIN representatives r ON p.representative_id = r.id WHERE 1=1`;
-  const params = [];
-
-  if (search) {
-    query += ` AND (p.film_name LIKE ? OR p.production_company LIKE ? OR p.invoice_no LIKE ?)`;
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-  }
-  if (status) { query += ` AND p.status = ?`; params.push(status); }
-  query += ' ORDER BY p.start_date DESC, p.id DESC';
-
-  const projects = db.prepare(query).all(...params);
-  const stats = db.prepare(`SELECT
+  const stats = await db.prepare(`SELECT
     COUNT(*) as total,
     SUM(amount) as total_amount,
     SUM(payment_received) as total_received,
     SUM(CASE WHEN status='Pending' THEN 1 ELSE 0 END) as pending,
     SUM(CASE WHEN status='Paid' THEN 1 ELSE 0 END) as paid
     FROM projects`).get();
-
-  res.render('projects/index', { title: 'Working Reports', projects, stats, search, status, STATUSES });
+  res.render('projects/index', { title: 'Working Reports', stats, search, status, STATUSES });
 };
 
-exports.showCreate = (req, res) => {
-  const reps = db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
+exports.data = async (req, res) => {
+  await db.ready;
+  try {
+    const draw = parseInt(req.query.draw) || 1;
+    const start = parseInt(req.query.start) || 0;
+    const length = Math.min(parseInt(req.query.length) || 25, 500);
+    const searchRaw = req.query.search;
+    const search = ((typeof searchRaw === 'object' ? searchRaw?.value : searchRaw) || '').trim();
+    const status = req.query.status || '';
+    const orderArr = Array.isArray(req.query.order) ? req.query.order : [];
+    const orderColIdx = parseInt(orderArr[0]?.column) || 0;
+    const orderDir = orderArr[0]?.dir === 'desc' ? 'DESC' : 'ASC';
+    const colMap = { 0: 'p.start_date', 1: 'p.end_date', 2: 'p.production_company', 3: 'p.film_name', 4: 'r.name', 5: 'p.amount', 6: 'p.status' };
+    const orderBy = colMap[orderColIdx] || 'p.start_date';
+
+    const whereParts = [];
+    const filterParams = [];
+    if (search) {
+      whereParts.push('(p.film_name LIKE ? OR p.production_company LIKE ? OR p.invoice_no LIKE ?)');
+      filterParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    if (status) { whereParts.push('p.status = ?'); filterParams.push(status); }
+
+    const where = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
+    const baseJoin = 'FROM projects p LEFT JOIN representatives r ON p.representative_id = r.id';
+
+    const batchResults = await db.batch([
+      { sql: 'SELECT COUNT(*) as cnt FROM projects', args: [] },
+      { sql: `SELECT COUNT(*) as cnt ${baseJoin} ${where}`, args: filterParams },
+      { sql: `SELECT p.id, p.film_name, p.production_company, p.language, p.start_date, p.end_date,
+              p.amount, p.payment_received, p.status, r.name as rep_name
+       ${baseJoin} ${where} ORDER BY ${orderBy} ${orderDir}, p.id DESC LIMIT ? OFFSET ?`,
+        args: [...filterParams, length, start] }
+    ]);
+    const totalRow    = batchResults[0].first() || { cnt: 0 };
+    const filteredRow = batchResults[1].first() || { cnt: 0 };
+    const rows        = batchResults[2].rows;
+
+    res.json({ draw, recordsTotal: totalRow.cnt, recordsFiltered: filteredRow.cnt, data: rows });
+  } catch (e) {
+    console.error('Projects data error:', e.message);
+    res.status(500).json({ draw: parseInt(req.query.draw) || 1, recordsTotal: 0, recordsFiltered: 0, data: [], error: e.message });
+  }
+};
+
+exports.exportCsv = async (req, res) => {
+  await db.ready;
+  const search = (req.query.search || '').trim();
+  const status = req.query.status || '';
+  const whereParts = [];
+  const filterParams = [];
+  if (search) {
+    whereParts.push('(p.film_name LIKE ? OR p.production_company LIKE ? OR p.invoice_no LIKE ?)');
+    filterParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+  if (status) { whereParts.push('p.status = ?'); filterParams.push(status); }
+  const where = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
+  const rows = await db.prepare(
+    `SELECT p.id, p.film_name, p.production_company, p.language, p.start_date, p.end_date,
+            p.amount, p.payment_received, p.status, p.invoice_no, r.name as rep_name
+     FROM projects p LEFT JOIN representatives r ON p.representative_id = r.id
+     ${where} ORDER BY p.start_date DESC, p.id DESC`
+  ).all(...filterParams);
+  const headers = ['ID', 'Film Name', 'Production Company', 'Language', 'Start Date', 'End Date', 'Amount', 'Received', 'Status', 'Invoice No', 'Representative'];
+  const fields = ['id', 'film_name', 'production_company', 'language', 'start_date', 'end_date', 'amount', 'payment_received', 'status', 'invoice_no', 'rep_name'];
+  const csv = [headers.join(','), ...rows.map(r => fields.map(f => JSON.stringify(r[f] ?? '')).join(','))].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="projects.csv"');
+  res.send(csv);
+};
+
+exports.showCreate = async (req, res) => {
+  await db.ready;
+  const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
   res.render('projects/form', {
     title: 'New Working Report',
     project: { status: 'Pending', amount: 0 },
@@ -40,8 +100,9 @@ exports.showCreate = (req, res) => {
   });
 };
 
-exports.create = (req, res) => {
+exports.create = async (req, res) => {
   try {
+    await db.ready;
     const data = sanitize(req.body);
     const validation = validate(data);
     const errors = validation.errors || [];
@@ -53,16 +114,13 @@ exports.create = (req, res) => {
     }
 
     if (errors.length) {
-      const reps = db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
+      const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
       return res.render('projects/form', { title: 'New Working Report', project: data, reps, LANGUAGES, STATUSES, errors, warnings });
     }
 
-    // ✅ Show warnings if project has zero amount
-    if (warnings.length) {
-      warnings.forEach(w => req.flash('warning', w));
-    }
+    if (warnings.length) warnings.forEach(w => req.flash('warning', w));
 
-    const result = db.prepare(`INSERT INTO projects
+    const result = await db.prepare(`INSERT INTO projects
       (film_name, production_company, production_company_address, language, production_contact_no,
        representative_id, place_of_dubbing, start_date, end_date, company_email, amount,
        payment_received, invoice_no, representative_form, working_report_file, status)
@@ -79,59 +137,55 @@ exports.create = (req, res) => {
     res.redirect(`/projects/${result.lastInsertRowid}`);
   } catch (err) {
     console.error('Project create error:', err.message);
-    const reps = db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
+    const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
     const data = sanitize(req.body);
     req.flash('error', `Failed to create project: ${err.message}`);
-    res.render('projects/form', {
-      title: 'New Working Report',
-      project: data,
-      reps,
-      LANGUAGES,
-      STATUSES,
-      errors: [`Database error: ${err.message}`]
-    });
+    res.render('projects/form', { title: 'New Working Report', project: data, reps, LANGUAGES, STATUSES, errors: [`Database error: ${err.message}`] });
   }
 };
 
-exports.show = (req, res) => {
-  const project = db.prepare(`SELECT p.*, r.name as rep_name FROM projects p
+exports.show = async (req, res) => {
+  await db.ready;
+  const project = await db.prepare(`SELECT p.*, r.name as rep_name FROM projects p
     LEFT JOIN representatives r ON p.representative_id = r.id WHERE p.id = ?`).get(req.params.id);
   if (!project) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
 
-  const vouchers = db.prepare(`SELECT v.*, m.full_name, m.membership_no, m.bank_account_no, m.ifsc_code, m.bank_name
+  const vouchers = await db.prepare(`SELECT v.*, m.full_name, m.membership_no, m.bank_account_no, m.ifsc_code, m.bank_name
     FROM vouchers v JOIN members m ON v.member_id = m.id WHERE v.project_id = ? ORDER BY v.id`).all(project.id);
 
-  const payments = db.prepare('SELECT * FROM project_payments WHERE project_id = ? ORDER BY transaction_date').all(project.id);
+  const payments = await db.prepare('SELECT * FROM project_payments WHERE project_id = ? ORDER BY transaction_date').all(project.id);
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
 
   res.render('projects/show', { title: project.film_name, project, vouchers, payments, totalPaid });
 };
 
-exports.invoice = (req, res) => {
-  const project = db.prepare(`SELECT p.*, r.name as rep_name FROM projects p
+exports.invoice = async (req, res) => {
+  await db.ready;
+  const project = await db.prepare(`SELECT p.*, r.name as rep_name FROM projects p
     LEFT JOIN representatives r ON p.representative_id = r.id WHERE p.id = ?`).get(req.params.id);
   if (!project) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
 
-  const vouchers = db.prepare(`SELECT v.*, m.full_name, m.membership_no FROM vouchers v
+  const vouchers = await db.prepare(`SELECT v.*, m.full_name, m.membership_no FROM vouchers v
     JOIN members m ON v.member_id = m.id WHERE v.project_id = ? ORDER BY v.id`).all(project.id);
 
-  const payments = db.prepare('SELECT * FROM project_payments WHERE project_id = ? ORDER BY transaction_date').all(project.id);
+  const payments = await db.prepare('SELECT * FROM project_payments WHERE project_id = ? ORDER BY transaction_date').all(project.id);
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
 
   res.render('projects/invoice', { title: `Invoice — ${project.film_name}`, project, vouchers, payments, totalPaid, layout: false });
 };
 
-exports.downloadInvoice = (req, res) => {
+exports.downloadInvoice = async (req, res) => {
   try {
+    await db.ready;
     const PDFDocument = require('pdfkit');
-    const project = db.prepare(`SELECT p.*, r.name as rep_name FROM projects p
+    const project = await db.prepare(`SELECT p.*, r.name as rep_name FROM projects p
       LEFT JOIN representatives r ON p.representative_id = r.id WHERE p.id = ?`).get(req.params.id);
     if (!project) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
 
-    const vouchers = db.prepare(`SELECT v.*, m.full_name, m.membership_no FROM vouchers v
+    const vouchers = await db.prepare(`SELECT v.*, m.full_name, m.membership_no FROM vouchers v
       JOIN members m ON v.member_id = m.id WHERE v.project_id = ? ORDER BY v.id`).all(project.id);
 
-    const payments = db.prepare('SELECT * FROM project_payments WHERE project_id = ? ORDER BY transaction_date').all(project.id);
+    const payments = await db.prepare('SELECT * FROM project_payments WHERE project_id = ? ORDER BY transaction_date').all(project.id);
     const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
     const balance = (project.amount || 0) - (project.payment_received || 0);
 
@@ -144,9 +198,8 @@ exports.downloadInvoice = (req, res) => {
 
     const BLUE = '#303493';
     const RED = '#EE3134';
-    const pageW = doc.page.width - 80; // usable width
+    const pageW = doc.page.width - 80;
 
-    // ---- Header ----
     doc.fontSize(13).fillColor(BLUE).font('Helvetica-Bold')
        .text('South Indian Cine, Television Artistes', 40, 40)
        .text('and Dubbing Artistes Union', 40, 56);
@@ -155,7 +208,6 @@ exports.downloadInvoice = (req, res) => {
        .text('10, Vijayaraghavapuram 4th Street, Saligamam, Chennai-600093', 40, 86)
        .text('044-23650223 / 23650225 / 23650229  |  sictadau@gmail.com', 40, 98);
 
-    // Invoice info (right side)
     doc.fontSize(10).fillColor('#000').font('Helvetica-Bold')
        .text(`Invoice No: ${project.id}`, 400, 40, { align: 'right', width: 155 });
     doc.fontSize(9).fillColor(project.status === 'Paid' ? BLUE : RED).font('Helvetica-Bold')
@@ -164,11 +216,9 @@ exports.downloadInvoice = (req, res) => {
        .text(`Start: ${project.start_date || '—'}`, 400, 72, { align: 'right', width: 155 })
        .text(`End:   ${project.end_date || '—'}`, 400, 84, { align: 'right', width: 155 });
 
-    // Divider
     doc.moveTo(40, 116).lineTo(555, 116).strokeColor(BLUE).lineWidth(2).stroke();
     let y = 126;
 
-    // ---- From / To ----
     doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold').text('FROM:', 40, y).text('TO:', 300, y);
     y += 14;
     doc.fontSize(9).fillColor('#000').font('Helvetica-Bold')
@@ -179,20 +229,15 @@ exports.downloadInvoice = (req, res) => {
        .text('Chennai-600093', 40, y)
        .text(`Film: ${project.film_name}`, 300, y);
     y += 11;
-    doc.text('', 40, y)
-       .text(`Language: ${project.language || '—'}`, 300, y);
+    doc.text('', 40, y).text(`Language: ${project.language || '—'}`, 300, y);
     y += 11;
-    doc.text('', 40, y)
-       .text(`POD: ${project.place_of_dubbing || '—'}`, 300, y);
+    doc.text('', 40, y).text(`POD: ${project.place_of_dubbing || '—'}`, 300, y);
     y += 11;
-    doc.text('', 40, y)
-       .text(`Contact: ${project.production_contact_no || '—'}`, 300, y);
+    doc.text('', 40, y).text(`Contact: ${project.production_contact_no || '—'}`, 300, y);
     y += 11;
-    doc.text('', 40, y)
-       .text(`Representative: ${project.rep_name || '—'}`, 300, y);
+    doc.text('', 40, y).text(`Representative: ${project.rep_name || '—'}`, 300, y);
     y += 18;
 
-    // ---- Summary boxes ----
     const boxW = pageW / 4;
     const boxes = [
       { label: 'TOTAL AMOUNT', value: `Rs.${(project.amount||0).toLocaleString('en-IN')}` },
@@ -209,13 +254,11 @@ exports.downloadInvoice = (req, res) => {
     });
     y += 46;
 
-    // ---- Artist Vouchers table ----
     doc.moveTo(40, y).lineTo(555, y).strokeColor(BLUE).lineWidth(1).stroke();
     y += 6;
     doc.fontSize(9).fillColor(BLUE).font('Helvetica-Bold').text(`Artist Vouchers (${vouchers.length})`, 40, y);
     y += 14;
 
-    // Table header
     const cols = [40, 80, 150, 330, 430];
     const colW = [38, 68, 178, 98, 80];
     const headers = ['ID', 'Mem No.', 'Artist Name', 'Character', 'Amount'];
@@ -241,7 +284,6 @@ exports.downloadInvoice = (req, res) => {
            .text(`Rs.${(v.amount||0).toLocaleString('en-IN')}`, cols[4] + 2, y + 2, { width: colW[4] - 4, align: 'right' });
         y += 14;
       });
-      // Total row
       const vTotal = vouchers.reduce((s, v) => s + (v.amount || 0), 0);
       doc.rect(40, y, pageW, 14).fillColor('#e8e9f8').fill();
       doc.fontSize(8).fillColor(BLUE).font('Helvetica-Bold')
@@ -250,7 +292,6 @@ exports.downloadInvoice = (req, res) => {
       y += 20;
     }
 
-    // ---- Bank details ----
     if (y > 680) { doc.addPage(); y = 40; }
     doc.rect(40, y, pageW, 58).fillColor('#f5f7ff').fill();
     doc.moveTo(40, y).lineTo(40, y + 58).strokeColor(BLUE).lineWidth(3).stroke();
@@ -265,7 +306,6 @@ exports.downloadInvoice = (req, res) => {
     bankLines.forEach(line => { doc.text(line, 50, y, { width: pageW - 14 }); y += 11; });
     y += 10;
 
-    // ---- Payment history ----
     if (payments.length > 0) {
       if (y > 680) { doc.addPage(); y = 40; }
       doc.moveTo(40, y).lineTo(555, y).strokeColor(BLUE).lineWidth(1).stroke();
@@ -301,7 +341,6 @@ exports.downloadInvoice = (req, res) => {
       y += 20;
     }
 
-    // ---- Signatures ----
     if (y > 680) { doc.addPage(); y = 40; }
     y += 10;
     doc.moveTo(40, y).lineTo(555, y).strokeColor(BLUE).lineWidth(1).stroke();
@@ -324,16 +363,18 @@ exports.downloadInvoice = (req, res) => {
   }
 };
 
-exports.showEdit = (req, res) => {
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+exports.showEdit = async (req, res) => {
+  await db.ready;
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
   if (!project) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
-  const reps = db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
+  const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
   res.render('projects/form', { title: 'Edit Working Report', project, reps, LANGUAGES, STATUSES, errors: [], isEdit: true });
 };
 
-exports.update = (req, res) => {
+exports.update = async (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+    await db.ready;
+    const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
     if (!project) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
 
     const data = sanitize(req.body);
@@ -356,16 +397,13 @@ exports.update = (req, res) => {
     }
 
     if (errors.length) {
-      const reps = db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
+      const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
       return res.render('projects/form', { title: 'Edit Working Report', project: { ...project, ...data }, reps, LANGUAGES, STATUSES, errors, warnings, isEdit: true });
     }
 
-    // ✅ Show warnings if project has zero amount
-    if (warnings.length) {
-      warnings.forEach(w => req.flash('warning', w));
-    }
+    if (warnings.length) warnings.forEach(w => req.flash('warning', w));
 
-    db.prepare(`UPDATE projects SET film_name=?, production_company=?, production_company_address=?,
+    await db.prepare(`UPDATE projects SET film_name=?, production_company=?, production_company_address=?,
       language=?, production_contact_no=?, representative_id=?, place_of_dubbing=?, start_date=?,
       end_date=?, company_email=?, amount=?, payment_received=?, invoice_no=?,
       representative_form=?, working_report_file=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
@@ -380,76 +418,72 @@ exports.update = (req, res) => {
     res.redirect(`/projects/${project.id}`);
   } catch (err) {
     console.error('Project update error:', err.message);
-    const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
-    const reps = db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
+    const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+    const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
     const data = sanitize(req.body);
     req.flash('error', `Failed to update project: ${err.message}`);
-    res.render('projects/form', {
-      title: 'Edit Working Report',
-      project: { ...project, ...data },
-      reps,
-      LANGUAGES,
-      STATUSES,
-      errors: [`Database error: ${err.message}`],
-      isEdit: true
-    });
+    res.render('projects/form', { title: 'Edit Working Report', project: { ...project, ...data }, reps, LANGUAGES, STATUSES, errors: [`Database error: ${err.message}`], isEdit: true });
   }
 };
 
-exports.destroy = (req, res) => {
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+exports.destroy = async (req, res) => {
+  await db.ready;
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
   if (!project) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
-  const vCount = db.prepare('SELECT COUNT(*) as cnt FROM vouchers WHERE project_id = ?').get(project.id).cnt;
-  if (vCount > 0) {
-    req.flash('error', `Cannot delete: ${vCount} voucher(s) linked.`);
+  const row = await db.prepare('SELECT COUNT(*) as cnt FROM vouchers WHERE project_id = ?').get(project.id);
+  if (row.cnt > 0) {
+    req.flash('error', `Cannot delete: ${row.cnt} voucher(s) linked.`);
     return res.redirect(`/projects/${project.id}`);
   }
   if (project.representative_form) deleteFile(path.join('./public', project.representative_form));
   if (project.working_report_file) deleteFile(path.join('./public', project.working_report_file));
-  db.prepare('DELETE FROM projects WHERE id = ?').run(project.id);
+  await db.prepare('DELETE FROM projects WHERE id = ?').run(project.id);
   req.flash('success', 'Project deleted.');
   res.redirect('/projects');
 };
 
-// Add payment to a project
-exports.addPayment = (req, res) => {
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+exports.addPayment = async (req, res) => {
+  await db.ready;
+  const project = await db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
   if (!project) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
 
   const { transaction_date, payment_type, notes, amount } = req.body;
   const amt = parseFloat(amount) || 0;
   if (amt <= 0) { req.flash('error', 'Invalid amount.'); return res.redirect(`/projects/${project.id}`); }
 
-  db.prepare('INSERT INTO project_payments (project_id, transaction_date, payment_type, notes, amount) VALUES (?,?,?,?,?)')
+  await db.prepare('INSERT INTO project_payments (project_id, transaction_date, payment_type, notes, amount) VALUES (?,?,?,?,?)')
     .run(project.id, transaction_date, payment_type, notes, amt);
 
-  const totalPaid = db.prepare('SELECT SUM(amount) as total FROM project_payments WHERE project_id = ?').get(project.id).total || 0;
-  db.prepare('UPDATE projects SET payment_received = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(totalPaid, project.id);
+  const row = await db.prepare('SELECT SUM(amount) as total FROM project_payments WHERE project_id = ?').get(project.id);
+  const totalPaid = row.total || 0;
+  await db.prepare('UPDATE projects SET payment_received = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(totalPaid, project.id);
 
   if (totalPaid >= project.amount && project.amount > 0) {
-    db.prepare("UPDATE projects SET status='Paid', updated_at=CURRENT_TIMESTAMP WHERE id=?").run(project.id);
+    await db.prepare("UPDATE projects SET status='Paid', updated_at=CURRENT_TIMESTAMP WHERE id=?").run(project.id);
   }
 
   req.flash('success', 'Payment recorded.');
   res.redirect(`/projects/${project.id}`);
 };
 
-// Reps management
-exports.repsIndex = (req, res) => {
-  const reps = db.prepare('SELECT * FROM representatives ORDER BY name').all();
+exports.repsIndex = async (req, res) => {
+  await db.ready;
+  const reps = await db.prepare('SELECT * FROM representatives ORDER BY name').all();
   res.render('projects/reps', { title: 'Representatives', reps, errors: [] });
 };
 
-exports.repCreate = (req, res) => {
+exports.repCreate = async (req, res) => {
+  await db.ready;
   const { name, contact, email } = req.body;
   if (!name?.trim()) { req.flash('error', 'Name required.'); return res.redirect('/projects/representatives'); }
-  db.prepare('INSERT INTO representatives (name, contact, email) VALUES (?,?,?)').run(name.trim(), contact || null, email || null);
+  await db.prepare('INSERT INTO representatives (name, contact, email) VALUES (?,?,?)').run(name.trim(), contact || null, email || null);
   req.flash('success', 'Representative added.');
   res.redirect('/projects/representatives');
 };
 
-exports.repDestroy = (req, res) => {
-  db.prepare('UPDATE representatives SET is_active=0 WHERE id=?').run(req.params.id);
+exports.repDestroy = async (req, res) => {
+  await db.ready;
+  await db.prepare('UPDATE representatives SET is_active=0 WHERE id=?').run(req.params.id);
   req.flash('success', 'Representative removed.');
   res.redirect('/projects/representatives');
 };
@@ -480,22 +514,12 @@ function sanitize(body) {
 function validate(data) {
   const errors = [];
   const warnings = [];
-
-  // ✅ Required fields
   if (!data.film_name) errors.push('Film name is required.');
   if (!data.production_company) errors.push('Production company is required.');
-
-  // ✅ CRITICAL: Check for zero amount
   if (data.amount === 0 || data.amount === '0' || data.amount === null || data.amount === undefined) {
-    // Don't prevent creation, but add prominent warning
-    warnings.push('⚠️ WARNING: Billing amount is ₹0. Make sure this is intentional. Non-billable projects should be marked as "TEST_" in the name.');
+    warnings.push('⚠️ WARNING: Billing amount is ₹0. Make sure this is intentional.');
   }
-
-  // ✅ Validate positive amount if provided
-  if (data.amount < 0) {
-    errors.push('Billing amount cannot be negative.');
-  }
-
+  if (data.amount < 0) errors.push('Billing amount cannot be negative.');
   return { errors, warnings };
 }
 

@@ -24,6 +24,8 @@ const upload = multer({
 
 router.use(requireAuth);
 router.get('/', memberController.index);
+router.get('/data', memberController.data);
+router.get('/export', memberController.exportCsv);
 router.get('/create', memberController.showCreate);
 router.post('/', upload.single('profile_picture'), memberController.create);
 router.get('/:id', memberController.show);

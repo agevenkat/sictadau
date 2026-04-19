@@ -11,7 +11,7 @@
 <!-- Quick filter -->
 <div class="card mb-3 border-0 shadow-sm">
   <div class="card-body py-2">
-    <form class="row g-2 align-items-end" method="GET">
+    <form class="row g-2 align-items-end" method="GET" id="filterForm">
       <div class="col-md-5">
         <input type="text" name="search" class="form-control form-control-sm" placeholder="Search name, membership no, contact..." value="<%= search %>">
       </div>
@@ -28,7 +28,7 @@
         <a href="/members" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
       </div>
     </form>
-    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle"></i> Click column headers to sort • Sort options appear on all columns</small>
+    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle"></i> Click column headers to sort &bull; Showing one page at a time for speed</small>
   </div>
 </div>
 
@@ -50,54 +50,101 @@
             <th></th>
           </tr>
         </thead>
-        <tbody>
-          <% members.forEach(m => { %>
-          <tr>
-            <td class="text-muted small"><%= m.membership_no %></td>
-            <td>
-              <% if (m.profile_picture) { %>
-                <img src="<%= m.profile_picture %>" class="member-photo" alt="">
-              <% } else { %>
-                <div class="member-photo-placeholder"><i class="bi bi-person"></i></div>
-              <% } %>
-            </td>
-            <td><a href="/members/<%= m.id %>" class="fw-medium text-decoration-none"><%= m.full_name %></a></td>
-            <td class="small text-muted"><%= m.contact_no || '—' %></td>
-            <td class="small">
-              <% try { const langs = JSON.parse(m.languages || '[]'); %><%= langs.join(', ') || '—' %><% } catch(e) { %><%= m.languages || '—' %><% } %>
-            </td>
-            <td class="small"><%= m.slang || '—' %></td>
-            <td class="small"><%= m.gender || '—' %></td>
-            <td class="small"><%= m.dob ? m.dob.split(' ')[0] : '—' %></td>
-            <td>
-              <span class="badge badge-<%= m.status.toLowerCase() %>"><%= m.status %></span>
-            </td>
-            <td>
-              <div class="d-flex gap-1">
-                <a href="/members/<%= m.id %>/edit" class="btn btn-xs btn-outline-secondary" style="font-size:0.75rem;padding:2px 8px;" title="Edit"><i class="bi bi-pencil"></i></a>
-              </div>
-            </td>
-          </tr>
-          <% }) %>
-        </tbody>
+        <tbody></tbody>
       </table>
     </div>
   </div>
 </div>
 
 <script>
-$(function(){
-  initDataTable('#membersTable', {
-    order: [[0, 'asc']],
-    columnDefs: [
-      { orderable: false, targets: [1, 9] },
+(function(){
+  const SEARCH = <%- JSON.stringify(search) %>;
+  const STATUS = <%- JSON.stringify(status) %>;
+
+  function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  // Parse YYYY-MM-DD prefix directly — avoids UTC-midnight timezone shift in IST browsers
+  function fmtDate(d) {
+    if (!d) return '—';
+    var m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return String(d);
+    var mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return m[3] + '-' + mon[parseInt(m[2])-1] + '-' + m[1];
+  }
+
+  $('#membersTable').DataTable({
+    serverSide: true,
+    processing: true,
+    searching: false,
+    ajax: {
+      url: '/members/data',
+      data: function(d) {
+        d.search.value = SEARCH;
+        d.status = STATUS;
+      }
+    },
+    columns: [
+      { data: 'membership_no', className: 'text-muted small' },
       {
-        targets: [1, 5, 6, 7],
-        visible: true,
-        responsivePriority: 10000
+        data: 'profile_picture', orderable: false,
+        render: function(data) {
+          if (data) return '<img src="' + escHtml(data) + '" class="member-photo" alt="">';
+          return '<div class="member-photo-placeholder"><i class="bi bi-person"></i></div>';
+        }
       },
-      { responsivePriority: 1, targets: [2, 8] }
-    ]
+      {
+        data: null, render: function(row) {
+          return '<a href="/members/' + row.id + '" class="fw-medium text-decoration-none">' + escHtml(row.full_name) + '</a>';
+        }
+      },
+      { data: 'contact_no', className: 'small text-muted', render: function(d) { return d || '—'; } },
+      {
+        data: 'languages', orderable: false, className: 'small',
+        render: function(data) {
+          try { var l = JSON.parse(data || '[]'); return l.length ? escHtml(l.join(', ')) : '—'; } catch(e) { return data || '—'; }
+        }
+      },
+      { data: 'slang', className: 'small', render: function(d) { return d ? escHtml(d) : '—'; } },
+      { data: 'gender', className: 'small', render: function(d) { return d || '—'; } },
+      { data: 'dob', className: 'small', render: function(d) { return fmtDate(d); } },
+      {
+        data: 'status',
+        render: function(d) {
+          return '<span class="badge badge-' + d.toLowerCase() + '">' + escHtml(d) + '</span>';
+        }
+      },
+      {
+        data: null, orderable: false,
+        render: function(row) {
+          return '<div class="d-flex gap-1"><a href="/members/' + row.id + '/edit" class="btn btn-xs btn-outline-secondary" style="font-size:0.75rem;padding:2px 8px;" title="Edit"><i class="bi bi-pencil"></i></a></div>';
+        }
+      }
+    ],
+    order: [[0, 'asc']],
+    pageLength: 25,
+    lengthMenu: [[25, 50, 100], ['25', '50', '100']],
+    pagingType: 'simple_numbers',
+    dom: "<'row mb-2'<'col-sm-12 col-md-6'B><'col-sm-6 col-md-6'l>>" +
+         "<'row'<'col-sm-12'tr>>" +
+         "<'row mt-2 align-items-center'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7 d-flex justify-content-end'p>>",
+    buttons: [
+      {
+        text: '<i class="bi bi-file-earmark-csv me-1"></i>Export CSV',
+        className: 'btn btn-sm btn-outline-secondary',
+        action: function() {
+          window.location.href = '/members/export?' + new URLSearchParams({search: SEARCH, status: STATUS}).toString();
+        }
+      }
+    ],
+    language: {
+      processing: '<span class="spinner-border spinner-border-sm text-primary me-1" role="status"></span> Loading...',
+      lengthMenu: '_MENU_ per page',
+      info: 'Showing _START_–_END_ of _TOTAL_',
+      infoEmpty: 'No records found',
+      infoFiltered: '(filtered)',
+      paginate: { first: '«', last: '»', next: '›', previous: '‹' }
+    }
   });
-});
+})();
 </script>

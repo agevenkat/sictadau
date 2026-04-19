@@ -24,6 +24,8 @@ const upload = multer({
 
 router.use(requireAuth);
 router.get('/', statementController.index);
+router.get('/data', statementController.data);
+router.get('/export', statementController.exportCsv);
 router.post('/', upload.single('receipt'), statementController.create);
 router.get('/:id/receipt', statementController.show);
 router.delete('/:id', requireAdmin, statementController.destroy);

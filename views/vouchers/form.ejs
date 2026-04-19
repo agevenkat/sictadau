@@ -17,14 +17,19 @@
     <div class="col-md-6">
       <div class="form-card">
         <div class="row g-3">
-          <div class="col-md-6">
+          <div class="col-md-4">
+            <label class="form-label">Voucher Date <span class="text-danger">*</span></label>
+            <input type="date" name="voucher_date" class="form-control"
+              value="<%= voucher.voucher_date || new Date().toISOString().slice(0,10) %>" required>
+          </div>
+          <div class="col-md-4">
             <label class="form-label">Voucher Type</label>
             <select name="voucher_type" class="form-select">
               <option value="Artist" <%= voucher.voucher_type === 'Artist' ? 'selected' : '' %>>Artist</option>
               <option value="Technical" <%= voucher.voucher_type === 'Technical' ? 'selected' : '' %>>Technical</option>
             </select>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label class="form-label">Recipient Name <span class="text-danger">*</span></label>
             <select name="member_id" id="member_select" class="form-select select2-search" required>
               <option value="">— Select Member —</option>
@@ -35,6 +40,15 @@
               <% }) %>
             </select>
           </div>
+          <!-- Duplicate warning banner -->
+          <div id="dupWarning" class="col-12" style="display:none;">
+            <div class="alert alert-warning py-2 mb-0 small">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>
+              <span id="dupMsg"></span>
+              <a id="dupLink" href="#" class="ms-2 alert-link" target="_blank">View existing</a>
+            </div>
+          </div>
+
           <div class="col-12">
             <label class="form-label">Movie Name <span class="text-danger">*</span></label>
             <select name="project_id" id="project_select" class="form-select select2-search" required>
@@ -137,6 +151,8 @@
 
 <script>
 $(function() {
+  const VOUCHER_ID = <%- typeof voucher !== 'undefined' && voucher.id ? voucher.id : 0 %>;
+
   // Auto-set rep when project changes
   $('#project_select').on('change', function() {
     const repId = this.options[this.selectedIndex]?.dataset?.rep;
@@ -144,7 +160,35 @@ $(function() {
       $('#rep_select').val(repId).trigger('change');
     }
     calcVoucherAmounts();
+    checkDuplicate();
   });
+
+  $('#member_select').on('change', function() {
+    checkDuplicate();
+  });
+
+  function checkDuplicate() {
+    const memberId = $('#member_select').val();
+    const projectId = $('#project_select').val();
+    if (!memberId || !projectId) {
+      $('#dupWarning').hide(); return;
+    }
+    $.getJSON('/vouchers/check-duplicate', { member_id: memberId, project_id: projectId, exclude_id: VOUCHER_ID })
+      .done(function(data) {
+        if (data.exists) {
+          const v = data.vouchers[0];
+          const extra = data.count > 1 ? ` (+${data.count - 1} more)` : '';
+          $('#dupMsg').text('This artist already has ' + data.count + ' voucher(s) for this project' + extra + '.');
+          $('#dupLink').attr('href', '/vouchers/' + v.id + '/show');
+          $('#dupWarning').show();
+        } else {
+          $('#dupWarning').hide();
+        }
+      });
+  }
+
+  // Run on page load (edit mode)
+  checkDuplicate();
 
   // Initial calc
   calcVoucherAmounts();

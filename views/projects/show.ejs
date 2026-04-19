@@ -1,185 +1,443 @@
 <% activePage = 'projects'; %>
 
-<!-- Print and Download Buttons -->
-<div class="d-print-none mb-3" style="display: flex; gap: 10px;">
-  <button onclick="window.print()" class="btn btn-sm" style="background: #303493; color: white; border: none;"><i class="bi bi-printer me-1"></i>Print</button>
-  <a href="/projects/<%= project.id %>/download-invoice" class="btn btn-sm" style="background: #EE3134; color: white; border: none;"><i class="bi bi-download me-1"></i>Download PDF</a>
-</div>
+<!-- ══ SCREEN LAYOUT (hidden when printing) ════════════════════════════════ -->
+<div class="d-print-none">
 
-<!-- Modern Professional Report -->
-<div style="background: #fff; padding: 40px; min-height: 900px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;">
-
-  <!-- Header -->
-  <div style="margin-bottom: 30px; display: flex; justify-content: space-between; border-bottom: 3px solid #303493; padding-bottom: 20px;">
+  <!-- Action bar -->
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div>
-      <div style="font-size: 13px; margin-bottom: 8px; color: #000000;">Project Entry Date : <strong style="color: #000000;"><%= project.start_date %></strong></div>
-      <div style="font-size: 13px; color: #000000;">Project End Date : <strong style="color: #000000;"><%= project.end_date %></strong></div>
+      <h4 class="fw-bold mb-0"><%= project.film_name %></h4>
+      <small class="text-muted"><%= project.production_company %></small>
     </div>
-    <div style="text-align: right;">
-      <div style="font-size: 13px; margin-bottom: 8px;">Invoice No. : <strong style="color: #303493; font-size: 18px;"><%= project.id %></strong></div>
-      <div style="font-size: 13px;">Status : <strong style="color: white; background: <%= project.status === 'Paid' ? '#303493' : '#EE3134' %>; padding: 4px 12px; border-radius: 4px;"><%= project.status %></strong></div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="/vouchers/create?project_id=<%= project.id %>" class="btn btn-sm btn-success">
+        <i class="bi bi-person-plus me-1"></i>Add Voucher
+      </a>
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addPaymentModal">
+        <i class="bi bi-cash-coin me-1"></i>Add Payment
+      </button>
+      <a href="/projects/<%= project.id %>/edit" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-pencil me-1"></i>Edit
+      </a>
+      <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-printer me-1"></i>Print
+      </button>
+      <a href="/projects/<%= project.id %>/download-invoice" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+      </a>
+      <% if (currentUser && ['admin','superadmin'].includes(currentUser.role)) { %>
+      <form action="/projects/<%= project.id %>" method="POST" class="d-inline"
+            onsubmit="return confirm('Delete this project permanently?')">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="_method" value="DELETE">
+        <button type="submit" class="btn btn-sm btn-outline-danger">
+          <i class="bi bi-trash me-1"></i>Delete
+        </button>
+      </form>
+      <% } %>
     </div>
   </div>
 
-  <!-- From and To -->
-  <div style="display: flex; justify-content: space-between; margin-bottom: 35px; gap: 40px;">
-    <!-- From -->
-    <div style="flex: 1; display: flex; gap: 20px;">
-      <div style="flex-shrink: 0;">
-        <img src="/images/logo.png" style="width: 90px; height: 90px; object-fit: contain; border-radius: 8px;">
+  <!-- KPI row -->
+  <%
+    const balance = (project.amount || 0) - (project.payment_received || 0);
+  %>
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-xl-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div class="fw-bold fs-5 text-primary">₹<%= (project.amount||0).toLocaleString('en-IN') %></div>
+        <div class="small text-muted">Total Billed</div>
       </div>
-      <div>
-        <div style="font-size: 11px; font-weight: 700; margin-bottom: 12px; color: #303493; letter-spacing: 0.5px; text-transform: uppercase;">From:</div>
-        <div style="font-size: 13px; line-height: 1.7; color: #000000;">
-          <strong style="font-size: 14px; color: #000000; display: block; margin-bottom: 6px;">South Indian Cine, Television Artistes and Dubbing Artistes Union</strong>
-          <span style="color: #000000; font-size: 12px;">ESTD : 1983 - Regd No. 1337/MDS</span><br>
-          <span style="color: #000000; font-size: 12px;">Affiliated with FEFSI</span><br>
-          <span style="color: #000000; font-size: 12px;">10, Vijayaraghavapuram 4th Street, Saligamam, Chennai-600093</span><br>
-          <span style="color: #000000; font-size: 12px;">044-23650223, 23650225, 23650229</span><br>
-          <span style="color: #303493; font-size: 12px; font-weight: 500;">sictadau@gmail.com</span>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div class="fw-bold fs-5 text-success">₹<%= (project.payment_received||0).toLocaleString('en-IN') %></div>
+        <div class="small text-muted">Received</div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div class="fw-bold fs-5 <%= balance > 0 ? 'text-danger' : 'text-success' %>">
+          ₹<%= Math.abs(balance).toLocaleString('en-IN') %>
+          <small class="fs-6"><%= balance > 0 ? 'Due' : 'Settled' %></small>
+        </div>
+        <div class="small text-muted">Balance</div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div class="fw-bold fs-5 text-dark"><%= vouchers.length %></div>
+        <div class="small text-muted">Artists</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project details + Payment history -->
+  <div class="row g-3 mb-3">
+
+    <!-- Left: Project details -->
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-file-earmark-text text-primary me-2"></i>Project Details</span>
+          <span class="badge badge-<%= project.status.toLowerCase() %>"><%= project.status %></span>
+        </div>
+        <div class="card-body">
+          <% const rows = [
+            ['Film Name',          project.film_name],
+            ['Production Company', project.production_company],
+            ['Language',           project.language],
+            ['Place of Dubbing',   project.place_of_dubbing],
+            ['Contact No',         project.production_contact_no],
+            ['Email',              project.company_email],
+            ['Representative',     project.rep_name],
+            ['Invoice No',         project.invoice_no],
+            ['Entry Date',         project.start_date],
+            ['End Date',           project.end_date],
+          ]; %>
+          <% rows.forEach(([label, val]) => { if (!val) return; %>
+          <div class="d-flex justify-content-between py-1 border-bottom border-light">
+            <span class="small text-muted"><%= label %></span>
+            <span class="small fw-medium text-end ms-3"><%= val %></span>
+          </div>
+          <% }) %>
+
+          <% if (project.representative_form || project.working_report_file) { %>
+          <div class="mt-2 d-flex gap-2 flex-wrap">
+            <% if (project.representative_form) { %>
+            <a href="<%= project.representative_form %>" target="_blank" class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;padding:3px 8px;">
+              <i class="bi bi-file-earmark me-1"></i>Rep Form
+            </a>
+            <% } %>
+            <% if (project.working_report_file) { %>
+            <a href="<%= project.working_report_file %>" target="_blank" class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;padding:3px 8px;">
+              <i class="bi bi-file-earmark me-1"></i>Working Report
+            </a>
+            <% } %>
+          </div>
+          <% } %>
         </div>
       </div>
     </div>
-    <!-- To -->
-    <div style="flex: 1;">
-      <div style="font-size: 11px; font-weight: 700; margin-bottom: 12px; color: #303493; letter-spacing: 0.5px; text-transform: uppercase;">To:</div>
-      <div style="font-size: 13px; line-height: 1.7; color: #000000;">
-        <strong style="font-size: 14px; color: #000000; display: block; margin-bottom: 6px;"><%= project.production_company %></strong>
-        <span style="color: #000000; font-size: 12px;">Project Name : <strong><%= project.film_name %></strong></span><br>
-        <span style="color: #000000; font-size: 12px;">Project Language : <strong><%= project.language || '—' %></strong></span><br>
-        <span style="color: #000000; font-size: 12px;">POD : <strong><%= project.place_of_dubbing || '—' %></strong></span><br>
-        <span style="color: #000000; font-size: 12px;">Contact : <%= project.production_contact_no || '—' %></span><br>
-        <span style="color: #000000; font-size: 12px;">Representative: <strong><%= project.rep_name || '—' %></strong></span>
+
+    <!-- Right: Payment history -->
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-cash-coin text-success me-2"></i>Payment History</span>
+          <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#addPaymentModal">
+            <i class="bi bi-plus-lg me-1"></i>Add Payment
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead>
+              <tr><th>Date</th><th>Type</th><th>Notes</th><th class="text-end">Amount</th></tr>
+            </thead>
+            <tbody>
+              <% if (payments.length === 0) { %>
+              <tr>
+                <td colspan="4" class="text-center text-muted py-3 small">
+                  <i class="bi bi-inbox d-block mb-1" style="font-size:1.5rem;"></i>No payments recorded yet
+                </td>
+              </tr>
+              <% } else { %>
+              <% payments.forEach(p => { %>
+              <tr>
+                <td class="small"><%= p.transaction_date %></td>
+                <td class="small fw-medium"><%= p.payment_type %></td>
+                <td class="small text-muted"><%= p.notes || '—' %></td>
+                <td class="small text-end text-success fw-medium">₹<%= (p.amount||0).toLocaleString('en-IN') %></td>
+              </tr>
+              <% }) %>
+              <tr class="table-success">
+                <td colspan="3" class="small fw-bold text-end">Total Received</td>
+                <td class="small fw-bold text-end text-success">₹<%= (totalPaid||0).toLocaleString('en-IN') %></td>
+              </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Summary Box -->
-  <div style="background: linear-gradient(135deg, #303493 0%, #1a1d5e 100%); padding: 28px; margin-bottom: 35px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-    <div style="display: flex; justify-content: space-around; text-align: center;">
+  <!-- Artist Vouchers -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-people-fill text-primary me-2"></i>Artist Vouchers (<%= vouchers.length %>)</span>
+      <a href="/vouchers/create?project_id=<%= project.id %>" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-person-plus me-1"></i>Add Voucher
+      </a>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead>
+          <tr>
+            <th>#</th><th>Mem No.</th><th>Artist Name</th><th>Character</th>
+            <th class="text-end">Gross</th><th class="text-end">Final</th>
+            <th>Mode</th><th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (vouchers.length === 0) { %>
+          <tr>
+            <td colspan="9" class="text-center text-muted py-4 small">
+              <i class="bi bi-person-plus d-block mb-1" style="font-size:1.5rem;"></i>No vouchers yet —
+              <a href="/vouchers/create?project_id=<%= project.id %>">Add the first one</a>
+            </td>
+          </tr>
+          <% } else { %>
+          <% vouchers.forEach(v => { %>
+          <tr>
+            <td class="small text-muted">#<%= v.id %></td>
+            <td class="small text-muted"><%= v.membership_no %></td>
+            <td class="small fw-medium">
+              <a href="/members/<%= v.member_id %>" class="text-decoration-none"><%= v.full_name %></a>
+            </td>
+            <td class="small"><%= v.character || '—' %></td>
+            <td class="small text-end">₹<%= (v.amount||0).toLocaleString('en-IN') %></td>
+            <td class="small text-end fw-medium <%= v.status === 'Paid' ? 'text-success' : 'text-warning' %>">₹<%= (v.final_amount||0).toLocaleString('en-IN') %></td>
+            <td class="small text-muted"><%= v.payment_method || '—' %></td>
+            <td><span class="badge badge-<%= v.status.toLowerCase() %>"><%= v.status %></span></td>
+            <td>
+              <a href="/vouchers/<%= v.id %>/show" class="btn btn-xs btn-outline-secondary"
+                 style="font-size:.72rem;padding:2px 7px;" target="_blank">Slip</a>
+            </td>
+          </tr>
+          <% }) %>
+          <tr class="table-light">
+            <td colspan="4" class="small fw-bold text-end">Total</td>
+            <td class="small fw-bold text-end">₹<%= vouchers.reduce((s,v)=>s+(v.amount||0),0).toLocaleString('en-IN') %></td>
+            <td class="small fw-bold text-end text-success">₹<%= vouchers.reduce((s,v)=>s+(v.final_amount||0),0).toLocaleString('en-IN') %></td>
+            <td colspan="3"></td>
+          </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- end d-print-none -->
+
+
+<!-- ══ PRINT LAYOUT (only visible when printing) ════════════════════════════ -->
+<div class="d-none d-print-block" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',sans-serif;font-size:13px;color:#000;padding:20px;">
+
+  <!-- Header -->
+  <div style="margin-bottom:30px;display:flex;justify-content:space-between;border-bottom:3px solid #303493;padding-bottom:20px;">
+    <div>
+      <div style="font-size:13px;margin-bottom:8px;">Project Entry Date : <strong><%= project.start_date %></strong></div>
+      <div style="font-size:13px;">Project End Date : <strong><%= project.end_date %></strong></div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:13px;margin-bottom:8px;">Invoice No. : <strong style="color:#303493;font-size:18px;"><%= project.id %></strong></div>
+      <div style="font-size:13px;">Status : <strong style="color:white;background:<%= project.status==='Paid'?'#303493':'#EE3134' %>;padding:4px 12px;border-radius:4px;"><%= project.status %></strong></div>
+    </div>
+  </div>
+
+  <!-- From / To -->
+  <div style="display:flex;justify-content:space-between;margin-bottom:35px;gap:40px;">
+    <div style="flex:1;display:flex;gap:20px;">
+      <div style="flex-shrink:0;">
+        <img src="/images/logo.png" style="width:90px;height:90px;object-fit:contain;border-radius:8px;" onerror="this.style.display='none'">
+      </div>
       <div>
-        <div style="font-size: 10px; color: #ffffff; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">TOTAL AMOUNT</div>
-        <div style="font-size: 20px; font-weight: 700; color: #fff;">₹<%= (project.amount||0).toLocaleString('en-IN') %></div>
+        <div style="font-size:11px;font-weight:700;margin-bottom:12px;color:#303493;letter-spacing:0.5px;text-transform:uppercase;">From:</div>
+        <div style="font-size:13px;line-height:1.7;">
+          <strong style="font-size:14px;display:block;margin-bottom:6px;">South Indian Cine, Television Artistes and Dubbing Artistes Union</strong>
+          <span style="font-size:12px;">ESTD : 1983 - Regd No. 1337/MDS</span><br>
+          <span style="font-size:12px;">Affiliated with FEFSI</span><br>
+          <span style="font-size:12px;">10, Vijayaraghavapuram 4th Street, Saligamam, Chennai-600093</span><br>
+          <span style="font-size:12px;">044-23650223, 23650225, 23650229</span><br>
+          <span style="font-size:12px;color:#303493;font-weight:500;">sictadau@gmail.com</span>
+        </div>
       </div>
-      <div style="border-left: 2px solid rgba(255,255,255,0.2); border-right: 2px solid rgba(255,255,255,0.2); padding: 0 30px;">
-        <div style="font-size: 10px; color: #ffffff; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">AMOUNT RECEIVED</div>
-        <div style="font-size: 20px; font-weight: 700; color: #fff;">₹<%= (project.payment_received||0).toLocaleString('en-IN') %></div>
-      </div>
-      <div>
-        <div style="font-size: 10px; color: #ffffff; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">BALANCE</div>
-        <div style="font-size: 20px; font-weight: 700; color: <%= ((project.amount||0) - (project.payment_received||0)) > 0 ? '#EE3134' : '#fff' %>;">₹<%= ((project.amount||0) - (project.payment_received||0)).toLocaleString('en-IN') %></div>
-      </div>
-      <div style="border-left: 2px solid rgba(255,255,255,0.2);">
-        <div style="font-size: 10px; color: #ffffff; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">TOTAL ARTISTS</div>
-        <div style="font-size: 20px; font-weight: 700; color: #fff;"><%= vouchers.length %></div>
+    </div>
+    <div style="flex:1;">
+      <div style="font-size:11px;font-weight:700;margin-bottom:12px;color:#303493;letter-spacing:0.5px;text-transform:uppercase;">To:</div>
+      <div style="font-size:13px;line-height:1.7;">
+        <strong style="font-size:14px;display:block;margin-bottom:6px;"><%= project.production_company %></strong>
+        <span style="font-size:12px;">Project Name : <strong><%= project.film_name %></strong></span><br>
+        <span style="font-size:12px;">Project Language : <strong><%= project.language || '—' %></strong></span><br>
+        <span style="font-size:12px;">POD : <strong><%= project.place_of_dubbing || '—' %></strong></span><br>
+        <span style="font-size:12px;">Contact : <%= project.production_contact_no || '—' %></span><br>
+        <span style="font-size:12px;">Representative: <strong><%= project.rep_name || '—' %></strong></span>
       </div>
     </div>
   </div>
 
-  <!-- Artist Vouchers Table -->
-  <div style="margin-bottom: 35px;">
-    <div style="font-size: 13px; font-weight: 700; margin-bottom: 15px; color: #303493; padding-bottom: 10px; border-bottom: 2px solid #303493;">Artist Vouchers (<%= vouchers.length %>)</div>
+  <!-- Summary box -->
+  <div style="background:linear-gradient(135deg,#303493 0%,#1a1d5e 100%);padding:28px;margin-bottom:35px;border-radius:8px;">
+    <div style="display:flex;justify-content:space-around;text-align:center;">
+      <div>
+        <div style="font-size:10px;color:#fff;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">TOTAL AMOUNT</div>
+        <div style="font-size:20px;font-weight:700;color:#fff;">₹<%= (project.amount||0).toLocaleString('en-IN') %></div>
+      </div>
+      <div style="border-left:2px solid rgba(255,255,255,0.2);border-right:2px solid rgba(255,255,255,0.2);padding:0 30px;">
+        <div style="font-size:10px;color:#fff;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">AMOUNT RECEIVED</div>
+        <div style="font-size:20px;font-weight:700;color:#fff;">₹<%= (project.payment_received||0).toLocaleString('en-IN') %></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:#fff;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">BALANCE</div>
+        <div style="font-size:20px;font-weight:700;color:<%= balance > 0 ? '#EE3134' : '#fff' %>;">₹<%= Math.abs(balance).toLocaleString('en-IN') %></div>
+      </div>
+      <div style="border-left:2px solid rgba(255,255,255,0.2);padding-left:30px;">
+        <div style="font-size:10px;color:#fff;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">TOTAL ARTISTS</div>
+        <div style="font-size:20px;font-weight:700;color:#fff;"><%= vouchers.length %></div>
+      </div>
+    </div>
+  </div>
 
+  <!-- Vouchers table -->
+  <div style="margin-bottom:35px;">
+    <div style="font-size:13px;font-weight:700;margin-bottom:15px;color:#303493;padding-bottom:10px;border-bottom:2px solid #303493;">Artist Vouchers (<%= vouchers.length %>)</div>
     <% if (vouchers.length === 0) { %>
-    <div style="padding: 30px; text-align: center; color: #999; font-size: 13px;">
-      No vouchers added yet
-    </div>
+    <div style="padding:30px;text-align:center;color:#999;font-size:13px;">No vouchers added yet</div>
     <% } else { %>
-    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead>
-        <tr style="background: #303493; color: white;">
-          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">ID</th>
-          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">Mem No.</th>
-          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">Dubbing Artist Name</th>
-          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">Character</th>
-          <th style="padding: 12px; text-align: right; font-weight: 700; border: none;">Total</th>
+        <tr style="background:#303493;color:white;">
+          <th style="padding:12px;text-align:left;border:none;">ID</th>
+          <th style="padding:12px;text-align:left;border:none;">Mem No.</th>
+          <th style="padding:12px;text-align:left;border:none;">Dubbing Artist Name</th>
+          <th style="padding:12px;text-align:left;border:none;">Character</th>
+          <th style="padding:12px;text-align:right;border:none;">Total</th>
         </tr>
       </thead>
       <tbody>
-        <% vouchers.forEach((v, idx) => { %>
-        <tr style="border-bottom: 1px solid #e0e0e0; background: <%= idx % 2 === 0 ? '#f9f9f9' : '#fff' %>;">
-          <td style="padding: 12px; color: #000000;"><%= v.id %></td>
-          <td style="padding: 12px; color: #000000;"><%= v.membership_no %></td>
-          <td style="padding: 12px; color: #000000; font-weight: 500;"><%= v.full_name %></td>
-          <td style="padding: 12px; color: #000000;"><%= v.character || '—' %></td>
-          <td style="padding: 12px; text-align: right; color: #303493; font-weight: 700;">Rs. <%= (v.amount||0).toLocaleString('en-IN') %></td>
+        <% vouchers.forEach((v,idx) => { %>
+        <tr style="border-bottom:1px solid #e0e0e0;background:<%= idx%2===0?'#f9f9f9':'#fff' %>;">
+          <td style="padding:12px;"><%= v.id %></td>
+          <td style="padding:12px;"><%= v.membership_no %></td>
+          <td style="padding:12px;font-weight:500;"><%= v.full_name %></td>
+          <td style="padding:12px;"><%= v.character || '—' %></td>
+          <td style="padding:12px;text-align:right;color:#303493;font-weight:700;">Rs. <%= (v.amount||0).toLocaleString('en-IN') %></td>
         </tr>
         <% }) %>
       </tbody>
     </table>
-
-    <div style="text-align: right; margin-top: 15px; padding-top: 15px; border-top: 2px solid #303493;">
-      <div style="font-size: 13px; display: inline-block;">
-        <strong style="color: #000000;">Total</strong>
-        <span style="display: inline-block; width: 200px; text-align: right; color: #303493; font-weight: 700; font-size: 15px;">Rs. <%= vouchers.reduce((s,v)=>s+(v.amount||0),0).toLocaleString('en-IN') %></span>
-      </div>
+    <div style="text-align:right;margin-top:15px;padding-top:15px;border-top:2px solid #303493;">
+      <strong>Total</strong>
+      <span style="display:inline-block;width:200px;text-align:right;color:#303493;font-weight:700;font-size:15px;">Rs. <%= vouchers.reduce((s,v)=>s+(v.amount||0),0).toLocaleString('en-IN') %></span>
     </div>
     <% } %>
   </div>
 
-  <!-- Bank Details -->
-  <div style="margin-bottom: 35px; padding: 18px; background: #f5f7ff; border-left: 4px solid #303493; border-radius: 4px; font-size: 12px;">
-    <div style="margin-bottom: 6px; color: #000000;"><strong>A/C Name :</strong> South Indian Cine, Television Artistes and Dubbing Artistes Union</div>
-    <div style="margin-bottom: 6px; color: #000000;"><strong>A/C NO. :</strong> 1616135000004793</div>
-    <div style="margin-bottom: 6px; color: #000000;"><strong>IFSC CODE :</strong> KVBL0001616</div>
-    <div style="margin-bottom: 6px; color: #000000;"><strong>BANK :</strong> KARUR VYSYA BANK, K.K.Nagar Branch</div>
-    <div style="color: #000000;"><strong>PAN NO. :</strong> AADAS9061M</div>
+  <!-- Bank details -->
+  <div style="margin-bottom:35px;padding:18px;background:#f5f7ff;border-left:4px solid #303493;border-radius:4px;font-size:12px;">
+    <div style="margin-bottom:6px;"><strong>A/C Name :</strong> South Indian Cine, Television Artistes and Dubbing Artistes Union</div>
+    <div style="margin-bottom:6px;"><strong>A/C NO. :</strong> 1616135000004793</div>
+    <div style="margin-bottom:6px;"><strong>IFSC CODE :</strong> KVBL0001616</div>
+    <div style="margin-bottom:6px;"><strong>BANK :</strong> KARUR VYSYA BANK, K.K.Nagar Branch</div>
+    <div><strong>PAN NO. :</strong> AADAS9061M</div>
   </div>
 
-  <!-- Payment History -->
+  <!-- Payment History (print) -->
   <% if (payments.length > 0) { %>
-  <div style="margin-bottom: 35px;">
-    <div style="font-size: 13px; font-weight: 700; margin-bottom: 15px; color: #303493; padding-bottom: 10px; border-bottom: 2px solid #303493;">Payment History</div>
-
-    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+  <div style="margin-bottom:35px;">
+    <div style="font-size:13px;font-weight:700;margin-bottom:15px;color:#303493;padding-bottom:10px;border-bottom:2px solid #303493;">Payment History</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead>
-        <tr style="background: #303493; color: white;">
-          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">ID</th>
-          <th style="padding: 12px; text-align: left; font-weight: 700; border: none; width: 15%;">Transaction Date</th>
-          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">Payment Type</th>
-          <th style="padding: 12px; text-align: left; font-weight: 700; border: none;">Notes</th>
-          <th style="padding: 12px; text-align: right; font-weight: 700; border: none;">Amount</th>
+        <tr style="background:#303493;color:white;">
+          <th style="padding:12px;text-align:left;border:none;">ID</th>
+          <th style="padding:12px;text-align:left;border:none;">Transaction Date</th>
+          <th style="padding:12px;text-align:left;border:none;">Payment Type</th>
+          <th style="padding:12px;text-align:left;border:none;">Notes</th>
+          <th style="padding:12px;text-align:right;border:none;">Amount</th>
         </tr>
       </thead>
       <tbody>
-        <% payments.forEach((p, idx) => { %>
-        <tr style="border-bottom: 1px solid #e0e0e0; background: <%= idx % 2 === 0 ? '#f9f9f9' : '#fff' %>;">
-          <td style="padding: 12px; color: #000000;"><%= p.id %></td>
-          <td style="padding: 12px; color: #000000;"><%= p.transaction_date %></td>
-          <td style="padding: 12px; color: #000000; font-weight: 500;"><%= p.payment_type %></td>
-          <td style="padding: 12px; color: #000000;"><%= p.notes || '—' %></td>
-          <td style="padding: 12px; text-align: right; color: #303493; font-weight: 700;">Rs. <%= p.amount.toLocaleString('en-IN') %></td>
+        <% payments.forEach((p,idx) => { %>
+        <tr style="border-bottom:1px solid #e0e0e0;background:<%= idx%2===0?'#f9f9f9':'#fff' %>;">
+          <td style="padding:12px;"><%= p.id %></td>
+          <td style="padding:12px;"><%= p.transaction_date %></td>
+          <td style="padding:12px;font-weight:500;"><%= p.payment_type %></td>
+          <td style="padding:12px;"><%= p.notes || '—' %></td>
+          <td style="padding:12px;text-align:right;color:#303493;font-weight:700;">Rs. <%= p.amount.toLocaleString('en-IN') %></td>
         </tr>
         <% }) %>
-        <tr style="background: #303493; color: white; font-weight: 700;">
-          <td colspan="4" style="padding: 12px; text-align: right;">Total Amount Received</td>
-          <td style="padding: 12px; text-align: right;">Rs. <%= totalPaid.toLocaleString('en-IN') %></td>
+        <tr style="background:#303493;color:white;font-weight:700;">
+          <td colspan="4" style="padding:12px;text-align:right;">Total Amount Received</td>
+          <td style="padding:12px;text-align:right;">Rs. <%= totalPaid.toLocaleString('en-IN') %></td>
         </tr>
       </tbody>
     </table>
   </div>
   <% } %>
 
-  <div style="border-top: 2px solid #303493; margin-bottom: 30px; padding-top: 30px;"></div>
-
-  <!-- Signature Section -->
-  <div style="display: flex; justify-content: space-around; margin-bottom: 20px; font-size: 12px;">
-    <div style="text-align: center;">
-      <div style="height: 45px; margin-bottom: 12px;"></div>
-      <div style="border-top: 2px solid #000000; padding-top: 8px; color: #000000; font-weight: 600;">Co-ordinator<br>Mr.C.D.Ananthraman</div>
+  <!-- Signatures -->
+  <div style="border-top:2px solid #303493;margin-bottom:30px;padding-top:30px;"></div>
+  <div style="display:flex;justify-content:space-around;margin-bottom:20px;font-size:12px;">
+    <div style="text-align:center;">
+      <div style="height:45px;margin-bottom:12px;"></div>
+      <div style="border-top:2px solid #000;padding-top:8px;font-weight:600;">Co-ordinator<br>Mr.C.D.Ananthraman</div>
     </div>
-    <div style="text-align: center;">
-      <div style="height: 45px; margin-bottom: 12px;"></div>
-      <div style="border-top: 2px solid #000000; padding-top: 8px; color: #000000; font-weight: 600;">Manager / Secretary<br>Treasurer</div>
+    <div style="text-align:center;">
+      <div style="height:45px;margin-bottom:12px;"></div>
+      <div style="border-top:2px solid #000;padding-top:8px;font-weight:600;">Manager / Secretary<br>Treasurer</div>
     </div>
-    <div style="text-align: center;">
-      <div style="height: 45px; margin-bottom: 12px;"></div>
-      <div style="border-top: 2px solid #000000; padding-top: 8px; color: #000000; font-weight: 600;">For <%= project.production_company %></div>
+    <div style="text-align:center;">
+      <div style="height:45px;margin-bottom:12px;"></div>
+      <div style="border-top:2px solid #000;padding-top:8px;font-weight:600;">For <%= project.production_company %></div>
     </div>
   </div>
+  <div style="font-size:11px;color:#999;text-align:center;font-style:italic;">*Cheque subject to realisation</div>
 
-  <div style="font-size: 11px; color: #999; text-align: center; margin-top: 20px; font-style: italic;">
-    *Cheque subject to realisation
+</div><!-- end d-print-block -->
+
+
+<!-- ══ Add Payment Modal ═══════════════════════════════════════════════════ -->
+<div class="modal fade" id="addPaymentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-cash-coin me-2 text-success"></i>Record Payment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="/projects/<%= project.id %>/payments" method="POST">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-medium">Transaction Date <span class="text-danger">*</span></label>
+            <input type="date" name="transaction_date" class="form-control"
+              value="<%= new Date().toISOString().slice(0,10) %>" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">Payment Type <span class="text-danger">*</span></label>
+            <select name="payment_type" class="form-select" required>
+              <option value="">— Select —</option>
+              <option value="Cash">Cash</option>
+              <option value="Cheque">Cheque</option>
+              <option value="NEFT">NEFT</option>
+              <option value="RTGS">RTGS</option>
+              <option value="Others">Others</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">Amount (₹) <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">₹</span>
+              <input type="number" name="amount" class="form-control" placeholder="0.00" step="0.01" min="1" required>
+            </div>
+            <% if (balance > 0) { %>
+            <div class="form-text text-danger">
+              Balance due: ₹<%= balance.toLocaleString('en-IN') %>
+            </div>
+            <% } %>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">Notes / Reference</label>
+            <input type="text" name="notes" class="form-control" placeholder="Cheque number, UTR, remarks…">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-check-lg me-1"></i>Record Payment
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
-
 </div>

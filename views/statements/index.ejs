@@ -34,17 +34,26 @@
         </select>
       </div>
       <div class="col-md-2">
-        <input type="date" name="from" class="form-control form-control-sm" value="<%= from %>" placeholder="From">
+        <input type="date" name="from" id="stmtFrom" class="form-control form-control-sm" value="<%= from %>" placeholder="From">
       </div>
       <div class="col-md-2">
-        <input type="date" name="to" class="form-control form-control-sm" value="<%= to %>" placeholder="To">
+        <input type="date" name="to" id="stmtTo" class="form-control form-control-sm" value="<%= to %>" placeholder="To">
       </div>
       <div class="col-auto">
         <button class="btn btn-sm btn-primary">Filter</button>
         <a href="/statements" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
       </div>
+      <div class="col-12 mt-1">
+        <div class="btn-group btn-group-sm" role="group">
+          <button type="button" class="btn btn-outline-secondary" onclick="stmtDatePreset('today')">Today</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="stmtDatePreset('week')">This Week</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="stmtDatePreset('month')">This Month</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="stmtDatePreset('lastmonth')">Last Month</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="stmtDatePreset('year')">This Year</button>
+        </div>
+      </div>
     </form>
-    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle"></i> Click column headers to sort • Default: Latest first</small>
+    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle"></i> Click column headers to sort &bull; Default: Latest first</small>
   </div>
 </div>
 
@@ -65,30 +74,7 @@
             <th>Action</th>
           </tr>
         </thead>
-        <tbody>
-          <% statements.forEach(s => { %>
-          <tr>
-            <td class="small"><%= new Date(s.transaction_date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) %></td>
-            <td class="small"><%= s.income_type || '—' %></td>
-            <td class="small"><%= s.paid_to || '—' %></td>
-            <td class="small text-muted"><%= s.film_name || '—' %></td>
-            <td class="small"><%= s.payment_mode || '—' %></td>
-            <td class="small text-muted" style="max-width:200px;"><%= s.transaction_remarks || '—' %></td>
-            <td>
-              <span class="badge <%= s.amount_type === 'Debit' ? 'bg-danger' : 'bg-success' %>"><%= s.amount_type %></span>
-            </td>
-            <td class="small fw-medium <%= s.amount_type === 'Debit' ? 'text-danger' : 'text-success' %>">
-              Rs. <%= (s.amount||0).toLocaleString('en-IN') %>
-            </td>
-            <td>
-              <% if (s.receipt) { %>
-                <a href="/statements/<%= s.id %>/receipt" class="btn btn-xs btn-outline-primary" style="font-size:0.75rem;padding:2px 6px;" target="_blank">View Receipt</a>
-              <% } %>
-              <a href="/statements/<%= s.id %>/receipt" class="btn btn-xs btn-outline-secondary" style="font-size:0.75rem;padding:2px 6px;" target="_blank">View</a>
-            </td>
-          </tr>
-          <% }) %>
-        </tbody>
+        <tbody></tbody>
       </table>
     </div>
   </div>
@@ -141,15 +127,121 @@
 </div>
 
 <script>
-$(function(){
-  initDataTable('#stmtTable', {
-    order: [[0, 'desc']], // Latest statements first
-    pageLength: 100,
-    columnDefs: [
-      { orderable: false, targets: [6, 8] },
-      { responsivePriority: 1, targets: [1, 7] },
-      { responsivePriority: 2, targets: [2] }
-    ]
+function stmtDatePreset(preset) {
+  function fmtLocal(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+  var now = new Date();
+  var from, to = fmtLocal(now);
+  if (preset === 'today') {
+    from = fmtLocal(now);
+  } else if (preset === 'week') {
+    var dow = now.getDay() || 7;
+    var mon = new Date(now); mon.setDate(now.getDate() - (dow - 1));
+    from = fmtLocal(mon);
+  } else if (preset === 'month') {
+    from = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+  } else if (preset === 'lastmonth') {
+    from = fmtLocal(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    to   = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 0));
+  } else if (preset === 'year') {
+    from = fmtLocal(new Date(now.getFullYear(), 0, 1));
+  }
+  document.getElementById('stmtFrom').value = from;
+  document.getElementById('stmtTo').value   = to;
+  document.getElementById('stmtFrom').closest('form').submit();
+}
+
+(function(){
+  const SEARCH = <%- JSON.stringify(search) %>;
+  const TYPE   = <%- JSON.stringify(type) %>;
+  const FROM   = <%- JSON.stringify(from) %>;
+  const TO     = <%- JSON.stringify(to) %>;
+
+  function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  // Parse YYYY-MM-DD prefix directly — avoids UTC-midnight timezone shift in IST browsers
+  function fmtDate(d) {
+    if (!d) return '—';
+    var m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return String(d);
+    var mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return m[3] + '-' + mon[parseInt(m[2])-1] + '-' + m[1];
+  }
+
+  $('#stmtTable').DataTable({
+    serverSide: true,
+    processing: true,
+    searching: false,
+    ajax: {
+      url: '/statements/data',
+      data: function(d) {
+        d.search.value = SEARCH;
+        d.type = TYPE;
+        d.from = FROM;
+        d.to   = TO;
+      }
+    },
+    columns: [
+      { data: 'transaction_date_f', className: 'small', defaultContent: '—' },
+      { data: 'income_type', className: 'small', render: function(d) { return d ? escHtml(d) : '—'; } },
+      { data: 'paid_to', className: 'small', render: function(d) { return d ? escHtml(d) : '—'; } },
+      { data: 'film_name', className: 'small text-muted', render: function(d) { return d ? escHtml(d) : '—'; } },
+      { data: 'payment_mode', className: 'small', render: function(d) { return d ? escHtml(d) : '—'; } },
+      { data: 'transaction_remarks', className: 'small text-muted', render: function(d) { return d ? escHtml(d) : '—'; } },
+      {
+        data: 'amount_type', orderable: false,
+        render: function(d) {
+          return '<span class="badge ' + (d === 'Debit' ? 'bg-danger' : 'bg-success') + '">' + escHtml(d) + '</span>';
+        }
+      },
+      {
+        data: null,
+        render: function(row) {
+          var cls = row.amount_type === 'Debit' ? 'text-danger' : 'text-success';
+          return '<span class="small fw-medium ' + cls + '">Rs. ' + (Number(row.amount)||0).toLocaleString('en-IN') + '</span>';
+        }
+      },
+      {
+        data: null, orderable: false,
+        render: function(row) {
+          var btn = '';
+          if (row.receipt) {
+            btn += '<a href="/statements/' + row.id + '/receipt" class="btn btn-xs btn-outline-primary me-1" style="font-size:0.75rem;padding:2px 6px;" target="_blank">View Receipt</a>';
+          }
+          btn += '<a href="/statements/' + row.id + '/receipt" class="btn btn-xs btn-outline-secondary" style="font-size:0.75rem;padding:2px 6px;" target="_blank">View</a>';
+          return btn;
+        }
+      }
+    ],
+    order: [[0, 'desc']],
+    pageLength: 25,
+    lengthMenu: [[25, 50, 100], ['25', '50', '100']],
+    pagingType: 'simple_numbers',
+    dom: "<'row mb-2'<'col-sm-12 col-md-6'B><'col-sm-6 col-md-6'l>>" +
+         "<'row'<'col-sm-12'tr>>" +
+         "<'row mt-2 align-items-center'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7 d-flex justify-content-end'p>>",
+    buttons: [
+      {
+        text: '<i class="bi bi-file-earmark-csv me-1"></i>Export CSV',
+        className: 'btn btn-sm btn-outline-secondary',
+        action: function() {
+          window.location.href = '/statements/export?' + new URLSearchParams({search: SEARCH, type: TYPE, from: FROM, to: TO}).toString();
+        }
+      }
+    ],
+    language: {
+      processing: '<span class="spinner-border spinner-border-sm text-primary me-1" role="status"></span> Loading...',
+      lengthMenu: '_MENU_ per page',
+      info: 'Showing _START_–_END_ of _TOTAL_',
+      infoEmpty: 'No records found',
+      infoFiltered: '(filtered)',
+      paginate: { first: '«', last: '»', next: '›', previous: '‹' }
+    }
   });
-});
+})();
 </script>

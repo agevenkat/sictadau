@@ -5,6 +5,10 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 router.use(requireAuth);
 router.get('/', voucherController.index);
+router.get('/data', voucherController.data);
+router.get('/export', voucherController.exportCsv);
+router.post('/export-selected', voucherController.exportSelected);
+router.get('/check-duplicate', voucherController.checkDuplicate);
 router.get('/create', voucherController.showCreate);
 router.post('/', voucherController.create);
 router.get('/:id/show', voucherController.show);

@@ -85,29 +85,79 @@
     </div>
   </div>
 
-  <!-- Vouchers -->
+  <!-- Voucher Payment Summary -->
+  <div class="col-12">
+    <div class="row g-3 mb-1">
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+          <div class="fw-bold fs-5 text-primary"><%= voucherStats.total %></div>
+          <div class="small text-muted">Total Vouchers</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+          <div class="fw-bold fs-5 text-success"><%= voucherStats.paid %></div>
+          <div class="small text-muted">Paid</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+          <div class="fw-bold fs-5 text-warning"><%= voucherStats.pending %></div>
+          <div class="small text-muted">Pending</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+          <div class="fw-bold fs-6 text-success">₹<%= Math.round(voucherStats.total_paid_amount).toLocaleString('en-IN') %></div>
+          <div class="small text-muted">Total Disbursed</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment History -->
   <div class="col-12">
     <div class="table-card card">
       <div class="card-header d-flex justify-content-between align-items-center py-2">
-        <span class="fw-semibold">Recent Vouchers</span>
-        <a href="/vouchers/create?member_id=<%= member.id %>" class="btn btn-sm btn-outline-primary">
-          <i class="bi bi-plus-lg me-1"></i>New Voucher
-        </a>
+        <span class="fw-semibold">
+          Payment History
+          <% if (voucherStats.pending > 0) { %>
+          <span class="badge bg-warning text-dark ms-1"><%= voucherStats.pending %> pending</span>
+          <% } %>
+        </span>
+        <div class="d-flex gap-2">
+          <% if (voucherStats.pending > 0) { %>
+          <span class="small text-danger fw-medium">₹<%= Math.round(voucherStats.total_pending_amount).toLocaleString('en-IN') %> due</span>
+          <% } %>
+          <a href="/vouchers/create?member_id=<%= member.id %>" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-plus-lg me-1"></i>New Voucher
+          </a>
+        </div>
       </div>
       <div class="table-responsive">
         <table class="table table-sm table-hover mb-0">
-          <thead><tr><th>#</th><th>Project</th><th>Character</th><th>Amount</th><th>Final</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Date</th><th>Project</th><th>Character</th><th>Gross</th><th>Final</th><th>Mode</th><th>Status</th><th></th></tr></thead>
           <tbody>
             <% if (vouchers.length === 0) { %>
-            <tr><td colspan="7" class="text-center text-muted py-3 small">No vouchers yet</td></tr>
+            <tr><td colspan="9" class="text-center text-muted py-3 small">No vouchers yet</td></tr>
             <% } else { %>
+            <%
+              const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+              function fmtVDate(d) {
+                if (!d) return '—';
+                const m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/);
+                return m ? m[3]+'-'+MON[parseInt(m[2])-1]+'-'+m[1] : String(d);
+              }
+            %>
             <% vouchers.forEach(v => { %>
             <tr>
               <td class="small text-muted">#<%= v.id %></td>
+              <td class="small text-muted"><%= fmtVDate(v.voucher_date) %></td>
               <td class="small"><%= v.film_name %></td>
               <td class="small"><%= v.character || '—' %></td>
               <td class="small">₹<%= (v.amount||0).toLocaleString('en-IN') %></td>
-              <td class="small fw-medium">₹<%= (v.final_amount||0).toLocaleString('en-IN') %></td>
+              <td class="small fw-medium <%= v.status === 'Paid' ? 'text-success' : 'text-warning' %>">₹<%= (v.final_amount||0).toLocaleString('en-IN') %></td>
+              <td class="small text-muted"><%= v.payment_method || '—' %></td>
               <td><span class="badge badge-<%= v.status.toLowerCase() %>"><%= v.status %></span></td>
               <td><a href="/vouchers/<%= v.id %>/show" class="btn btn-xs btn-outline-secondary" style="font-size:0.75rem;padding:2px 8px;">View</a></td>
             </tr>

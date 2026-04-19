@@ -25,7 +25,7 @@
         <a href="/projects" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
       </div>
     </form>
-    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle"></i> Click column headers to sort • Default: Latest first</small>
+    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle"></i> Click column headers to sort &bull; Default: Latest first</small>
   </div>
 </div>
 
@@ -45,44 +45,97 @@
             <th style="width: 80px;">Actions</th>
           </tr>
         </thead>
-        <tbody>
-          <% projects.forEach(p => { %>
-          <tr>
-            <td class="small text-muted"><%= p.start_date ? new Date(p.start_date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—' %></td>
-            <td class="small text-muted"><%= p.end_date ? new Date(p.end_date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—' %></td>
-            <td class="small"><%= p.production_company %></td>
-            <td><a href="/projects/<%= p.id %>" class="fw-medium text-decoration-none"><%= p.film_name %><% if(p.language) { %> <span class="text-muted small">(<%= p.language %>)</span><% } %></a></td>
-            <td class="small"><%= p.rep_name || '—' %></td>
-            <td class="small fw-medium"><%= p.amount > 0 ? p.amount.toLocaleString('en-IN') : '0' %></td>
-            <td>
-              <% if (p.status === 'Paid') { %><span class="badge badge-paid">Paid</span>
-              <% } else if (p.status === 'Completed') { %><span class="badge badge-completed">Completed</span>
-              <% } else { %><span class="badge badge-pending">Pending</span>
-              <% } %>
-            </td>
-            <td class="text-center">
-              <div class="btn-group btn-group-sm" role="group">
-                <a href="/projects/<%= p.id %>" class="btn btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a>
-                <a href="/projects/<%= p.id %>/edit" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
-              </div>
-            </td>
-          </tr>
-          <% }) %>
-        </tbody>
+        <tbody></tbody>
       </table>
     </div>
   </div>
 </div>
 
 <script>
-$(function(){
-  initDataTable('#projectsTable', {
+(function(){
+  const SEARCH = <%- JSON.stringify(search) %>;
+  const STATUS = <%- JSON.stringify(status) %>;
+
+  function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  // Parse YYYY-MM-DD prefix directly — avoids UTC-midnight timezone shift in IST browsers
+  function fmtDate(d) {
+    if (!d) return '—';
+    var m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return String(d);
+    var mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return m[3] + '-' + mon[parseInt(m[2])-1] + '-' + m[1];
+  }
+  function fmtAmount(n) {
+    return n > 0 ? Number(n).toLocaleString('en-IN') : '0';
+  }
+
+  $('#projectsTable').DataTable({
+    serverSide: true,
+    processing: true,
+    searching: false,
+    ajax: {
+      url: '/projects/data',
+      data: function(d) {
+        d.search.value = SEARCH;
+        d.status = STATUS;
+      }
+    },
+    columns: [
+      { data: 'start_date', className: 'small text-muted', render: function(d) { return fmtDate(d); } },
+      { data: 'end_date', className: 'small text-muted', render: function(d) { return fmtDate(d); } },
+      { data: 'production_company', className: 'small', render: function(d) { return escHtml(d||'—'); } },
+      {
+        data: null, render: function(row) {
+          var lang = row.language ? ' <span class="text-muted small">(' + escHtml(row.language) + ')</span>' : '';
+          return '<a href="/projects/' + row.id + '" class="fw-medium text-decoration-none">' + escHtml(row.film_name) + lang + '</a>';
+        }
+      },
+      { data: 'rep_name', className: 'small', render: function(d) { return d ? escHtml(d) : '—'; } },
+      { data: 'amount', className: 'small fw-medium', render: function(d) { return fmtAmount(d); } },
+      {
+        data: 'status',
+        render: function(d) {
+          if (d === 'Paid') return '<span class="badge badge-paid">Paid</span>';
+          if (d === 'Completed') return '<span class="badge badge-completed">Completed</span>';
+          return '<span class="badge badge-pending">Pending</span>';
+        }
+      },
+      {
+        data: null, orderable: false, className: 'text-center',
+        render: function(row) {
+          return '<div class="btn-group btn-group-sm" role="group">' +
+            '<a href="/projects/' + row.id + '" class="btn btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a>' +
+            '<a href="/projects/' + row.id + '/edit" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>' +
+            '</div>';
+        }
+      }
+    ],
     order: [[0, 'desc']],
-    columnDefs: [
-      { orderable: false, targets: [7] },
-      { responsivePriority: 1, targets: [3, 6] },
-      { responsivePriority: 2, targets: [4] }
-    ]
+    pageLength: 25,
+    lengthMenu: [[25, 50, 100], ['25', '50', '100']],
+    pagingType: 'simple_numbers',
+    dom: "<'row mb-2'<'col-sm-12 col-md-6'B><'col-sm-6 col-md-6'l>>" +
+         "<'row'<'col-sm-12'tr>>" +
+         "<'row mt-2 align-items-center'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7 d-flex justify-content-end'p>>",
+    buttons: [
+      {
+        text: '<i class="bi bi-file-earmark-csv me-1"></i>Export CSV',
+        className: 'btn btn-sm btn-outline-secondary',
+        action: function() {
+          window.location.href = '/projects/export?' + new URLSearchParams({search: SEARCH, status: STATUS}).toString();
+        }
+      }
+    ],
+    language: {
+      processing: '<span class="spinner-border spinner-border-sm text-primary me-1" role="status"></span> Loading...',
+      lengthMenu: '_MENU_ per page',
+      info: 'Showing _START_–_END_ of _TOTAL_',
+      infoEmpty: 'No records found',
+      infoFiltered: '(filtered)',
+      paginate: { first: '«', last: '»', next: '›', previous: '‹' }
+    }
   });
-});
+})();
 </script>

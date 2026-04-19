@@ -1,6 +1,16 @@
-// Sidebar toggle
+// Sidebar toggle (mobile)
+function closeSidebar() {
+  document.getElementById('sidebar')?.classList.remove('show');
+  const overlay = document.getElementById('sidebarOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
 document.getElementById('sidebarToggle')?.addEventListener('click', () => {
-  document.getElementById('sidebar')?.classList.toggle('show');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  if (sidebar) {
+    sidebar.classList.toggle('show');
+    if (overlay) overlay.style.display = sidebar.classList.contains('show') ? 'block' : 'none';
+  }
 });
 
 // Method override for PUT/DELETE forms

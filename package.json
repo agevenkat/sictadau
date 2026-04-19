@@ -4,13 +4,16 @@
   "description": "South Indian Cine, Television Artistes and Dubbing Artistes Union - Billing Software",
   "main": "app.js",
   "scripts": {
-    "start": "node --experimental-sqlite app.js",
-    "dev": "nodemon --exec 'node --experimental-sqlite' app.js"
+    "start": "node app.js",
+    "dev": "nodemon app.js"
   },
   "dependencies": {
+    "@libsql/client": "^0.14.0",
     "bcryptjs": "^3.0.3",
     "connect-flash": "^0.1.1",
     "connect-sqlite3": "^0.9.15",
+    "cookie-parser": "^1.4.7",
+    "cookie-session": "^2.1.1",
     "csurf": "^1.11.0",
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",

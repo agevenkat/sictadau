@@ -58,6 +58,8 @@ const handleMulterError = (err, req, res, next) => {
 
 router.use(requireAuth);
 router.get('/', projectController.index);
+router.get('/data', projectController.data);
+router.get('/export', projectController.exportCsv);
 router.get('/representatives', requireAdmin, projectController.repsIndex);
 router.post('/representatives', requireAdmin, projectController.repCreate);
 router.delete('/representatives/:id', requireAdmin, projectController.repDestroy);

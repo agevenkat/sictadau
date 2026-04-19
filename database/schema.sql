@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS vouchers (
   representative_percent REAL NOT NULL DEFAULT 5,
   representative_amount REAL NOT NULL DEFAULT 0,
   final_amount REAL NOT NULL DEFAULT 0,
+  voucher_date DATE,
   paid_on DATETIME,
   payment_method TEXT NOT NULL DEFAULT 'NEFT' CHECK(payment_method IN ('Cash','Cheque','NEFT','RTGS','Others')),
   payment_notes TEXT,
@@ -128,11 +129,23 @@ CREATE TABLE IF NOT EXISTS statements (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Migrations (safe — ALTER TABLE is ignored if column already exists via error suppression in db.js)
+ALTER TABLE vouchers ADD COLUMN voucher_date DATE;
+
+-- Backfill voucher_date from created_at for rows that still have NULL (safe to re-run)
+UPDATE vouchers SET voucher_date = date(created_at) WHERE voucher_date IS NULL;
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_members_membership_no ON members(membership_no);
 CREATE INDEX IF NOT EXISTS idx_members_status ON members(status);
+CREATE INDEX IF NOT EXISTS idx_members_full_name ON members(full_name);
 CREATE INDEX IF NOT EXISTS idx_vouchers_member ON vouchers(member_id);
 CREATE INDEX IF NOT EXISTS idx_vouchers_project ON vouchers(project_id);
 CREATE INDEX IF NOT EXISTS idx_vouchers_status ON vouchers(status);
+CREATE INDEX IF NOT EXISTS idx_vouchers_created_at ON vouchers(created_at);
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+CREATE INDEX IF NOT EXISTS idx_projects_start_date ON projects(start_date);
+CREATE INDEX IF NOT EXISTS idx_vouchers_date ON vouchers(voucher_date);
 CREATE INDEX IF NOT EXISTS idx_statements_date ON statements(transaction_date);
+CREATE INDEX IF NOT EXISTS idx_statements_amount_type ON statements(amount_type);
+CREATE INDEX IF NOT EXISTS idx_statements_project ON statements(project_id);
