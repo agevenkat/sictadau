@@ -19,15 +19,21 @@ const express = require('express');
 const path = require('path');
 const session = require('express-session');
 
+const cookieParser = require('cookie-parser');
 const flash = require('connect-flash');
 const helmet = require('helmet');
 const methodOverride = require('method-override');
 const expressLayouts = require('express-ejs-layouts');
 const csrf = require('csurf');
 const bcrypt = require('bcryptjs');
+const IS_VERCEL = process.env.VERCEL === '1';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Trust Vercel's reverse proxy so req.protocol === 'https' inside Lambdas
+// (required for cookie-session / cookies library to set Secure cookies)
+if (IS_VERCEL) app.set('trust proxy', 1);
 
 // ---- Security headers ----
 app.use(helmet({
@@ -47,7 +53,11 @@ app.use(helmet({
 // ---- View engine ----
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-app.use(expressLayouts);
+// Skip express-ejs-layouts for auth routes — login.ejs is a self-contained HTML page
+app.use((req, res, next) => {
+  if (req.path.startsWith('/auth')) return next();
+  expressLayouts(req, res, next);
+});
 app.set('layout', 'layout');
 app.set('layout extractScripts', true);
 app.set('layout extractStyles', true);
@@ -69,31 +79,59 @@ app.use(methodOverride((req) => {
 }));
 app.use(methodOverride('_method'));
 
+// ---- Cookie parser (required for cookie-based CSRF) ----
+app.use(cookieParser());
+
+// ---- Cache-Control: no-store for all dynamic responses ----
+// Prevents Vercel CDN from caching responses and stripping Set-Cookie headers
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
 // ---- Session ----
-// Use SQLite session store locally; MemoryStore on Vercel (serverless is stateless anyway)
-let sessionStore = undefined;
-if (process.env.VERCEL !== '1') {
+// On Vercel (serverless) use cookie-session: stores all data in a signed cookie,
+// so sessions survive across Lambda cold starts with no server-side store.
+// Locally use express-session + SQLite store for persistence across restarts.
+if (IS_VERCEL) {
+  const cookieSession = require('cookie-session');
+  app.use(cookieSession({
+    name: 'sictadau.sid',
+    secret: process.env.SESSION_SECRET || 'sictadau-fallback-secret-change-in-prod',
+    maxAge: 8 * 60 * 60 * 1000, // 8 hours
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax'
+  }));
+  // connect-flash expects req.session.save to exist
+  app.use((req, res, next) => {
+    if (req.session && !req.session.save) {
+      req.session.save = (cb) => { if (cb) cb(); };
+    }
+    next();
+  });
+} else {
+  let sessionStore;
   try {
     const SQLiteStore = require('connect-sqlite3')(session);
     sessionStore = new SQLiteStore({ db: 'sessions.db', dir: './database' });
   } catch (e) {
     console.warn('connect-sqlite3 unavailable, using MemoryStore:', e.message);
   }
+  app.use(session({
+    store: sessionStore,
+    secret: process.env.SESSION_SECRET || 'sictadau-fallback-secret-change-in-prod',
+    resave: false,
+    saveUninitialized: true,
+    name: 'sictadau.sid',
+    cookie: {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      maxAge: 8 * 60 * 60 * 1000
+    }
+  }));
 }
-
-app.use(session({
-  store: sessionStore,
-  secret: process.env.SESSION_SECRET || 'sictadau-fallback-secret-change-in-prod',
-  resave: false,
-  saveUninitialized: false,
-  name: 'sictadau.sid',
-  cookie: {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 8 * 60 * 60 * 1000 // 8 hours
-  }
-}));
 
 // ---- Flash messages ----
 app.use(flash());
@@ -110,6 +148,13 @@ app.use((req, res, next) => {
 const { attachUser } = require('./middleware/auth');
 app.use(attachUser);
 
+// ---- Ready-gate: block requests until DB is initialised + admin seeded ----
+// appReady is set below after seedAdmin() is defined; Promise is already settled
+// on warm Lambdas so this adds zero latency on all but the very first cold start.
+app.use(async (req, res, next) => {
+  try { await global._appReady; next(); } catch (e) { next(e); }
+});
+
 // ---- Routes ----
 app.use('/auth', require('./routes/auth'));
 app.get('/', (req, res) => res.redirect('/dashboard'));
@@ -118,6 +163,7 @@ app.use('/members', require('./routes/members'));
 app.use('/projects', require('./routes/projects'));
 app.use('/vouchers', require('./routes/vouchers'));
 app.use('/statements', require('./routes/statements'));
+app.use('/reports', require('./routes/reports'));
 app.use('/users', require('./routes/users'));
 
 // ---- CSRF error handler ----
@@ -143,10 +189,11 @@ app.use((err, req, res, next) => {
 // ---- Seed first superadmin if no users exist ----
 async function seedAdmin() {
   try {
-    const count = db.prepare('SELECT COUNT(*) as cnt FROM users').get().cnt;
-    if (count === 0) {
+    await db.ready;
+    const row = await db.prepare('SELECT COUNT(*) as cnt FROM users').get();
+    if (row.cnt === 0) {
       const hash = await bcrypt.hash('Admin@1234', 12);
-      db.prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'superadmin')")
+      await db.prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'superadmin')")
         .run('Administrator', 'admin@sictadau.org', hash);
       console.log('✅  Default admin created: admin@sictadau.org / Admin@1234');
     }
@@ -155,8 +202,8 @@ async function seedAdmin() {
   }
 }
 
-// Run seed (non-blocking)
-seedAdmin();
+// Store seed promise in global so the ready-gate middleware (registered above) can await it
+global._appReady = seedAdmin();
 
 // ---- Local dev: start server; Vercel: export app ----
 if (process.env.NODE_ENV !== 'production') {
