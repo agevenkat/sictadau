@@ -13,7 +13,7 @@ exports.index = async (req, res) => {
         COALESCE((SELECT SUM(amount) FROM rep_payments WHERE status='Pending'), 0) AS total_pending
       FROM vouchers v
       JOIN projects p ON v.project_id = p.id
-      WHERE p.project_type = 'Film' AND v.representative_id IS NOT NULL
+      WHERE COALESCE(p.project_type, 'Film') = 'Film' AND v.representative_id IS NOT NULL
     `).get(),
 
     db.prepare(`
@@ -31,7 +31,7 @@ exports.index = async (req, res) => {
       JOIN vouchers v         ON v.representative_id = r.id
       JOIN projects p         ON v.project_id = p.id
       LEFT JOIN rep_payments rp ON rp.representative_id = r.id AND rp.project_id = p.id
-      WHERE p.project_type = 'Film' AND v.representative_id IS NOT NULL
+      WHERE COALESCE(p.project_type, 'Film') = 'Film' AND v.representative_id IS NOT NULL
       GROUP BY r.id, p.id
       ORDER BY r.name, p.film_name
     `).all()
