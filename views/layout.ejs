@@ -80,11 +80,7 @@
           <i class="bi bi-journal-text"></i>Statement
         </a>
       </li>
-      <li class="nav-item">
-        <a href="/reports" class="nav-link <%= locals.activePage === 'reports' ? 'active' : '' %>">
-          <i class="bi bi-graph-up-arrow"></i>Reports
-        </a>
-      </li>
+      <!-- Reports nav hidden -->
 
       <% if (currentUser && ['admin','superadmin'].includes(currentUser.role)) { %>
       <span class="nav-section-label">Administration</span>
