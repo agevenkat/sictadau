@@ -98,13 +98,7 @@
           <i class="bi bi-person-badge"></i>Representatives
         </a>
       </li>
-      <% if (activeMedium !== 'Television') { %>
-      <li class="nav-item">
-        <a href="/rep-payments" class="nav-link <%= locals.activePage === 'rep-payments' ? 'active' : '' %>">
-          <i class="bi bi-cash-stack"></i>Rep Income
-        </a>
-      </li>
-      <% } %>
+      <%# Rep Income hidden — <% if (activeMedium !== 'Television') { %> %>
       <% } %>
     </ul>
 
