@@ -50,5 +50,7 @@ router.get('/:id', memberController.show);
 router.get('/:id/edit', memberController.showEdit);
 router.put('/:id', uploadPhoto, memberController.update);
 router.delete('/:id', memberController.destroy);
+router.post('/:id/fees', memberController.createFee);
+router.delete('/:id/fees/:fid', memberController.destroyFee);
 
 module.exports = router;

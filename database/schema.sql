@@ -146,6 +146,21 @@ CREATE TABLE IF NOT EXISTS rep_payments (
 CREATE INDEX IF NOT EXISTS idx_rep_payments_rep ON rep_payments(representative_id);
 CREATE INDEX IF NOT EXISTS idx_rep_payments_project ON rep_payments(project_id);
 
+-- Membership Fee Payments (per-member fee tracking)
+CREATE TABLE IF NOT EXISTS membership_fees (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_id    INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  fee_type     TEXT NOT NULL DEFAULT 'Annual',
+  year         INTEGER,
+  amount       REAL NOT NULL DEFAULT 0,
+  payment_date DATE NOT NULL,
+  payment_mode TEXT NOT NULL DEFAULT 'Cash',
+  receipt_no   TEXT,
+  notes        TEXT,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_membership_fees_member ON membership_fees(member_id);
+
 -- Migrations (safe — ALTER TABLE is ignored if column already exists via error suppression in db.js)
 ALTER TABLE vouchers ADD COLUMN voucher_date DATE;
 ALTER TABLE projects ADD COLUMN project_type TEXT NOT NULL DEFAULT 'Film';

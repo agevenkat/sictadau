@@ -139,11 +139,28 @@ exports.show = async (req, res) => {
   if (!member) { req.flash('error', 'Member not found.'); return res.redirect('/members'); }
   member.languages = safeParseJSON(member.languages, []);
 
-  const vouchers = await db.prepare(`SELECT v.id, v.status, v.amount, v.final_amount, v.character,
-    v.gw_fund_amount, v.representative_amount, v.payment_method, v.paid_on,
-    COALESCE(v.voucher_date, date(v.created_at)) as voucher_date, p.film_name
-    FROM vouchers v LEFT JOIN projects p ON v.project_id = p.id
-    WHERE v.member_id = ? ORDER BY COALESCE(v.voucher_date, v.created_at) DESC`).all(member.id);
+  const [vouchers, fees, legacyFees, feeStats] = await Promise.all([
+    db.prepare(`SELECT v.id, v.status, v.amount, v.final_amount, v.character,
+      v.gw_fund_amount, v.representative_amount, v.payment_method, v.paid_on,
+      COALESCE(v.voucher_date, date(v.created_at)) as voucher_date, p.film_name
+      FROM vouchers v LEFT JOIN projects p ON v.project_id = p.id
+      WHERE v.member_id = ? ORDER BY COALESCE(v.voucher_date, v.created_at) DESC`).all(member.id),
+
+    db.prepare(`SELECT * FROM membership_fees WHERE member_id = ?
+      ORDER BY payment_date DESC, id DESC`).all(member.id),
+
+    db.prepare(`SELECT id, transaction_date, transaction_remarks, payment_mode, amount, receipt
+      FROM statements
+      WHERE income_type = 'Membership Fee'
+        AND LOWER(TRIM(COALESCE(paid_to,''))) = LOWER(TRIM(?))
+      ORDER BY transaction_date DESC`).all(member.full_name),
+
+    db.prepare(`SELECT
+      COUNT(*)                      AS total_entries,
+      COALESCE(SUM(amount), 0)      AS total_paid,
+      MAX(year)                     AS last_year
+      FROM membership_fees WHERE member_id = ?`).get(member.id)
+  ]);
 
   const voucherStats = {
     total: vouchers.length,
@@ -153,7 +170,49 @@ exports.show = async (req, res) => {
     total_pending_amount: vouchers.filter(v => v.status === 'Pending').reduce((s, v) => s + (v.final_amount || 0), 0)
   };
 
-  res.render('members/show', { title: member.full_name, member, vouchers, voucherStats });
+  res.render('members/show', { title: member.full_name, member, vouchers, voucherStats, fees, legacyFees, feeStats: feeStats || {} });
+};
+
+// ── Record membership fee ────────────────────────────────────────────────────
+exports.createFee = async (req, res) => {
+  await db.ready;
+  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);
+  if (!member) { req.flash('error', 'Member not found.'); return res.redirect('/members'); }
+
+  const fee_type    = (req.body.fee_type || 'Annual').trim();
+  const year        = req.body.year ? parseInt(req.body.year) : null;
+  const amount      = parseFloat(req.body.amount) || 0;
+  const payment_date = req.body.payment_date || new Date().toISOString().slice(0, 10);
+  const payment_mode = req.body.payment_mode || 'Cash';
+  const receipt_no  = (req.body.receipt_no || '').trim() || null;
+  const notes       = (req.body.notes || '').trim() || null;
+
+  if (amount <= 0) { req.flash('error', 'Amount must be greater than 0.'); return res.redirect(`/members/${member.id}`); }
+
+  await db.prepare(`INSERT INTO membership_fees
+    (member_id, fee_type, year, amount, payment_date, payment_mode, receipt_no, notes)
+    VALUES (?,?,?,?,?,?,?,?)`
+  ).run(member.id, fee_type, year, amount, payment_date, payment_mode, receipt_no, notes);
+
+  // Auto-post Credit to Statement ledger
+  const remarks = `${fee_type} — ${member.full_name} (${member.membership_no})${year ? ' — ' + year : ''}`;
+  await db.prepare(`INSERT INTO statements
+    (transaction_date, income_type, paid_to, project_id, payment_mode, transaction_remarks, amount_type, amount)
+    VALUES (?, 'Membership Fee', ?, NULL, ?, ?, 'Credit', ?)`
+  ).run(payment_date, member.full_name, payment_mode, remarks, amount);
+
+  req.flash('success', `Fee of ₹${amount.toLocaleString('en-IN')} recorded and posted to Statement ledger.`);
+  res.redirect(`/members/${member.id}#fees`);
+};
+
+// ── Delete membership fee ────────────────────────────────────────────────────
+exports.destroyFee = async (req, res) => {
+  await db.ready;
+  const fee = await db.prepare('SELECT * FROM membership_fees WHERE id = ? AND member_id = ?').get(req.params.fid, req.params.id);
+  if (!fee) { req.flash('error', 'Fee entry not found.'); return res.redirect(`/members/${req.params.id}`); }
+  await db.prepare('DELETE FROM membership_fees WHERE id = ?').run(fee.id);
+  req.flash('success', 'Fee entry deleted. Note: the corresponding Statement ledger entry remains as a financial record.');
+  res.redirect(`/members/${req.params.id}#fees`);
 };
 
 exports.showEdit = async (req, res) => {
