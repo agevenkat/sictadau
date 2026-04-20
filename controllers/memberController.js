@@ -151,7 +151,7 @@ exports.show = async (req, res) => {
 
     db.prepare(`SELECT id, transaction_date, transaction_remarks, payment_mode, amount, receipt
       FROM statements
-      WHERE income_type = 'Membership Fee'
+      WHERE LOWER(REPLACE(income_type, '_', ' ')) LIKE '%membership%fee%'
         AND LOWER(TRIM(COALESCE(paid_to,''))) = LOWER(TRIM(?))
       ORDER BY transaction_date DESC`).all(member.full_name),
 
