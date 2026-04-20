@@ -17,8 +17,8 @@ exports.index = async (req, res) => {
     SUM(CASE WHEN v.status='Pending' THEN 1 ELSE 0 END) as pending,
     SUM(CASE WHEN v.status='Paid' THEN 1 ELSE 0 END) as paid,
     SUM(CASE WHEN v.status='Paid' THEN v.final_amount ELSE 0 END) as paid_amount
-    FROM vouchers v JOIN projects p ON v.project_id = p.id WHERE p.project_type = ?`).get(medium);
-  const projects = await db.prepare('SELECT id, film_name FROM projects WHERE project_type = ? ORDER BY film_name').all(medium);
+    FROM vouchers v JOIN projects p ON v.project_id = p.id WHERE COALESCE(p.project_type, 'Film') = ?`).get(medium);
+  const projects = await db.prepare("SELECT id, film_name FROM projects WHERE COALESCE(project_type, 'Film') = ? ORDER BY film_name").all(medium);
   res.render('vouchers/index', { title: 'Artist Vouchers', stats, search, status, project_id, from, to, projects, medium });
 };
 
@@ -42,7 +42,7 @@ exports.data = async (req, res) => {
     const orderBy = colMap[orderColIdx] || 'COALESCE(v.voucher_date, v.created_at)';
 
     const medium = req.session.activeMedium || 'Film';
-    const whereParts = ['p.project_type = ?'];
+    const whereParts = ["COALESCE(p.project_type, 'Film') = ?"];
     const filterParams = [medium];
     if (search) {
       whereParts.push('(m.full_name LIKE ? OR m.membership_no LIKE ? OR p.film_name LIKE ?)');
@@ -60,7 +60,7 @@ exports.data = async (req, res) => {
       LEFT JOIN representatives r ON v.representative_id = r.id`;
 
     const batchResults = await db.batch([
-      { sql: 'SELECT COUNT(*) as cnt FROM vouchers v JOIN projects p ON v.project_id = p.id WHERE p.project_type = ?', args: [medium] },
+      { sql: "SELECT COUNT(*) as cnt FROM vouchers v JOIN projects p ON v.project_id = p.id WHERE COALESCE(p.project_type, 'Film') = ?", args: [medium] },
       { sql: `SELECT COUNT(*) as cnt ${baseJoin} ${where}`, args: filterParams },
       { sql: `SELECT v.id, v.member_id, v.project_id, v.status, v.final_amount,
               COALESCE(v.voucher_date, date(v.created_at)) AS voucher_date, v.created_at,
@@ -102,7 +102,7 @@ exports.exportCsv = async (req, res) => {
   const project_id = req.query.project_id || '';
   const from = req.query.from || '';
   const to = req.query.to || '';
-  const whereParts = ['p.project_type = ?'];
+  const whereParts = ["COALESCE(p.project_type, 'Film') = ?"];
   const filterParams = [medium];
   if (search) {
     whereParts.push('(m.full_name LIKE ? OR m.membership_no LIKE ? OR p.film_name LIKE ?)');
@@ -185,7 +185,7 @@ exports.showCreate = async (req, res) => {
   const medium = req.session.activeMedium || 'Film';
   const isTv = medium === 'Television';
   const members = await db.prepare("SELECT id, membership_no, full_name FROM members WHERE status='Active' ORDER BY CAST(membership_no AS INTEGER)").all();
-  const projects = await db.prepare("SELECT id, film_name, representative_id FROM projects WHERE status != 'Paid' AND project_type = ? ORDER BY film_name").all(medium);
+  const projects = await db.prepare("SELECT id, film_name, representative_id FROM projects WHERE status != 'Paid' AND COALESCE(project_type, 'Film') = ? ORDER BY film_name").all(medium);
   const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
   const preProject = req.query.project_id ? parseInt(req.query.project_id) : null;
 
@@ -216,7 +216,7 @@ exports.create = async (req, res) => {
 
   if (errors.length) {
     const members = await db.prepare("SELECT id, membership_no, full_name FROM members WHERE status='Active' ORDER BY CAST(membership_no AS INTEGER)").all();
-    const projects = await db.prepare("SELECT id, film_name FROM projects WHERE project_type = ? ORDER BY film_name").all(medium);
+    const projects = await db.prepare("SELECT id, film_name FROM projects WHERE COALESCE(project_type, 'Film') = ? ORDER BY film_name").all(medium);
     const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
     return res.render('vouchers/form', { title: 'New Voucher', voucher: data, members, projects, reps, CHARACTERS, errors, medium });
   }
@@ -273,7 +273,7 @@ exports.showEdit = async (req, res) => {
   const proj = await db.prepare('SELECT project_type FROM projects WHERE id = ?').get(voucher.project_id);
   const medium = proj?.project_type || req.session.activeMedium || 'Film';
   const members = await db.prepare("SELECT id, membership_no, full_name FROM members ORDER BY CAST(membership_no AS INTEGER)").all();
-  const projects = await db.prepare('SELECT id, film_name FROM projects WHERE project_type = ? ORDER BY film_name').all(medium);
+  const projects = await db.prepare("SELECT id, film_name FROM projects WHERE COALESCE(project_type, 'Film') = ? ORDER BY film_name").all(medium);
   const reps = await db.prepare('SELECT id, name FROM representatives WHERE is_active=1 ORDER BY name').all();
   res.render('vouchers/form', { title: 'Edit Voucher', voucher, members, projects, reps, CHARACTERS, errors: [], isEdit: true, medium });
 };

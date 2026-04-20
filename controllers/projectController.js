@@ -16,7 +16,7 @@ exports.index = async (req, res) => {
     SUM(payment_received) as total_received,
     SUM(CASE WHEN status='Pending' THEN 1 ELSE 0 END) as pending,
     SUM(CASE WHEN status='Paid' THEN 1 ELSE 0 END) as paid
-    FROM projects WHERE project_type = ?`).get(medium);
+    FROM projects WHERE COALESCE(project_type, 'Film') = ?`).get(medium);
   const pageTitle = medium === 'Television' ? 'TV Projects' : 'Working Reports';
   res.render('projects/index', { title: pageTitle, stats, search, status, STATUSES, medium });
 };
@@ -37,7 +37,7 @@ exports.data = async (req, res) => {
     const orderBy = colMap[orderColIdx] || 'p.start_date';
 
     const medium = req.session.activeMedium || 'Film';
-    const whereParts = ['p.project_type = ?'];
+    const whereParts = ["COALESCE(p.project_type, 'Film') = ?"];
     const filterParams = [medium];
     if (search) {
       whereParts.push('(p.film_name LIKE ? OR p.production_company LIKE ? OR p.invoice_no LIKE ?)');
@@ -49,7 +49,7 @@ exports.data = async (req, res) => {
     const baseJoin = 'FROM projects p LEFT JOIN representatives r ON p.representative_id = r.id';
 
     const batchResults = await db.batch([
-      { sql: 'SELECT COUNT(*) as cnt FROM projects WHERE project_type = ?', args: [medium] },
+      { sql: "SELECT COUNT(*) as cnt FROM projects WHERE COALESCE(project_type, 'Film') = ?", args: [medium] },
       { sql: `SELECT COUNT(*) as cnt ${baseJoin} ${where}`, args: filterParams },
       { sql: `SELECT p.id, p.film_name, p.production_company, p.language, p.start_date, p.end_date,
               p.amount, p.payment_received, p.status, r.name as rep_name, r.id as rep_id
@@ -72,7 +72,7 @@ exports.exportCsv = async (req, res) => {
   const medium = req.session.activeMedium || 'Film';
   const search = (req.query.search || '').trim();
   const status = req.query.status || '';
-  const whereParts = ['p.project_type = ?'];
+  const whereParts = ["COALESCE(p.project_type, 'Film') = ?"];
   const filterParams = [medium];
   if (search) {
     whereParts.push('(p.film_name LIKE ? OR p.production_company LIKE ? OR p.invoice_no LIKE ?)');

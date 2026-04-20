@@ -19,10 +19,10 @@ exports.index = async (req, res) => {
     SUM(CASE WHEN s.amount_type='Credit' THEN s.amount ELSE 0 END) as total_credit,
     SUM(CASE WHEN s.amount_type='Debit' THEN s.amount ELSE 0 END) as total_debit
     FROM statements s LEFT JOIN projects p ON s.project_id = p.id
-    WHERE (s.project_id IS NULL OR p.project_type = ?)`).get(medium);
+    WHERE (s.project_id IS NULL OR COALESCE(p.project_type, 'Film') = ?)`).get(medium);
 
   const balance = (totals.total_credit || 0) - (totals.total_debit || 0);
-  const projects = await db.prepare('SELECT id, film_name FROM projects WHERE project_type = ? ORDER BY film_name').all(medium);
+  const projects = await db.prepare("SELECT id, film_name FROM projects WHERE COALESCE(project_type, 'Film') = ? ORDER BY film_name").all(medium);
 
   res.render('statements/index', {
     title: 'Statement', totals, balance,
@@ -48,7 +48,7 @@ exports.data = async (req, res) => {
     const orderBy = colMap[orderColIdx] || 's.transaction_date';
 
     const medium = req.session.activeMedium || 'Film';
-    const whereParts = ['(s.project_id IS NULL OR p.project_type = ?)'];
+    const whereParts = ["(s.project_id IS NULL OR COALESCE(p.project_type, 'Film') = ?)"];
     const filterParams = [medium];
     if (search) {
       whereParts.push('(s.paid_to LIKE ? OR s.income_type LIKE ? OR s.transaction_remarks LIKE ?)');
@@ -62,7 +62,7 @@ exports.data = async (req, res) => {
     const baseJoin = 'FROM statements s LEFT JOIN projects p ON s.project_id = p.id';
 
     const batchResults = await db.batch([
-      { sql: 'SELECT COUNT(*) as cnt FROM statements s LEFT JOIN projects p ON s.project_id = p.id WHERE (s.project_id IS NULL OR p.project_type = ?)', args: [medium] },
+      { sql: "SELECT COUNT(*) as cnt FROM statements s LEFT JOIN projects p ON s.project_id = p.id WHERE (s.project_id IS NULL OR COALESCE(p.project_type, 'Film') = ?)", args: [medium] },
       { sql: `SELECT COUNT(*) as cnt ${baseJoin} ${where}`, args: filterParams },
       { sql: `SELECT s.id, s.transaction_date, s.income_type, s.paid_to, s.payment_mode,
               s.transaction_remarks, s.amount_type, s.amount, s.receipt, p.film_name
