@@ -200,33 +200,50 @@ a:hover { color: var(--primary-dark); }
 
 /* Medium switcher */
 .medium-switcher {
-  padding: 10px 14px 12px;
+  padding: 10px 14px 14px;
   border-bottom: 1px solid rgba(255,255,255,.1);
 }
 .medium-switcher-label {
   font-size: 9px;
-  color: rgba(255,255,255,.45);
+  color: rgba(255,255,255,.4);
   text-transform: uppercase;
-  letter-spacing: .7px;
-  margin-bottom: 7px;
+  letter-spacing: .8px;
+  margin-bottom: 8px;
   font-weight: 600;
 }
-.medium-switcher-pills { display: flex; gap: 6px; }
+.medium-switcher-track {
+  display: flex;
+  background: rgba(0,0,0,.3);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+}
 .medium-pill {
   flex: 1;
-  background: rgba(255,255,255,.08);
-  color: rgba(255,255,255,.6);
-  border: 1px solid rgba(255,255,255,.15);
-  border-radius: 20px;
-  padding: 5px 0;
+  background: transparent;
+  color: rgba(255,255,255,.45);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 4px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: background .15s, color .15s, border-color .15s;
+  transition: background .15s, color .15s;
   font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  line-height: 1;
+  white-space: nowrap;
 }
-.medium-pill:hover { background: rgba(255,255,255,.18); color: #fff; border-color: rgba(255,255,255,.4); }
-.medium-pill-active { background: rgba(255,255,255,.22) !important; color: #fff !important; border-color: rgba(255,255,255,.55) !important; }
+.medium-pill i { font-size: 12px; }
+.medium-pill:hover { color: rgba(255,255,255,.8); background: rgba(255,255,255,.08); }
+.medium-pill-active {
+  background: rgba(255,255,255,.18) !important;
+  color: #fff !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
 
 /* Footer */
 .sidebar-footer {

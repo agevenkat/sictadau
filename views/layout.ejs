@@ -34,19 +34,19 @@
     <% if (currentUser && activeMedium) { %>
     <div class="medium-switcher">
       <div class="medium-switcher-label">Active Medium</div>
-      <div class="medium-switcher-pills">
-        <form action="/auth/select-medium" method="POST" class="d-inline">
+      <div class="medium-switcher-track">
+        <form action="/auth/select-medium" method="POST" style="flex:1;display:contents;">
           <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
           <input type="hidden" name="medium" value="Film">
           <button type="submit" class="medium-pill <%= activeMedium === 'Film' ? 'medium-pill-active' : '' %>">
-            🎬 Film
+            <i class="bi bi-camera-reels-fill"></i> Film
           </button>
         </form>
-        <form action="/auth/select-medium" method="POST" class="d-inline">
+        <form action="/auth/select-medium" method="POST" style="flex:1;display:contents;">
           <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
           <input type="hidden" name="medium" value="Television">
           <button type="submit" class="medium-pill <%= activeMedium === 'Television' ? 'medium-pill-active' : '' %>">
-            📺 TV
+            <i class="bi bi-tv-fill"></i> TV
           </button>
         </form>
       </div>
