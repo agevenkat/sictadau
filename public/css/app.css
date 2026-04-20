@@ -198,6 +198,23 @@ a:hover { color: var(--primary-dark); }
   display: block;
 }
 
+/* ── Television mode — green sidebar ── */
+body[data-medium="Television"] {
+  --sidebar-bg:     #0a1f12;
+  --sidebar-hover:  rgba(255,255,255,.07);
+  --sidebar-active: #16a34a;
+}
+body[data-medium="Television"] .sidebar .nav-link.active {
+  box-shadow: 0 4px 14px rgba(22,163,74,.4);
+}
+body[data-medium="Television"] .sidebar .nav-link.active::before {
+  background: #86efac;
+}
+body[data-medium="Television"] .medium-pill-active {
+  background: rgba(134,239,172,.2) !important;
+  color: #86efac !important;
+}
+
 /* Medium switcher */
 .medium-switcher {
   padding: 10px 14px 14px;
