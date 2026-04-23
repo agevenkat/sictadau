@@ -187,10 +187,24 @@ app.use('/reports', require('./routes/reports'));
 app.use('/users', require('./routes/users'));
 
 // ---- CSRF error handler ----
+// res.redirect('back') falls back to '/' when Referer is missing, which silently
+// lands the user on the dashboard. Instead, derive a sensible form URL from the path.
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
-    req.flash('error', 'Invalid form submission. Please try again.');
-    return res.redirect('back');
+    req.flash('error', 'Your session expired while the form was open. Please fill it in again.');
+    // Derive form URL: PUT/DELETE → /:resource/:id/edit, POST → /:resource/create
+    const parts = req.path.split('/').filter(Boolean); // e.g. ['members','42'] or ['members']
+    const resource = parts[0] || '';
+    const id = parts[1];
+    let formUrl = '/';
+    if (resource) {
+      if ((req.method === 'PUT' || req.method === 'DELETE') && id) {
+        formUrl = `/${resource}/${id}/edit`;
+      } else {
+        formUrl = `/${resource}/create`;
+      }
+    }
+    return res.redirect(formUrl);
   }
   next(err);
 });

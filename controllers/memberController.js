@@ -99,6 +99,7 @@ exports.showCreate = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
+  try {
   await db.ready;
   const data = sanitizeMemberData(req.body);
   const errors = validateMember(data);
@@ -134,6 +135,11 @@ exports.create = async (req, res) => {
   if (req.body._action === 'create_close') return res.redirect('/members');
   const created = await db.prepare('SELECT id FROM members WHERE membership_no = ?').get(data.membership_no);
   res.redirect(created ? `/members/${created.id}` : '/members');
+  } catch (err) {
+    console.error('Member create error:', err.message);
+    req.flash('error', `Failed to save member: ${err.message}`);
+    res.redirect('/members/create');
+  }
 };
 
 exports.show = async (req, res) => {
