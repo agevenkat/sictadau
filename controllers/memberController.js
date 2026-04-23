@@ -106,7 +106,10 @@ exports.create = async (req, res) => {
   if (req.file) data.profile_picture = '/uploads/' + req.file.filename;
 
   const existing = await db.prepare('SELECT id FROM members WHERE membership_no = ?').get(data.membership_no);
-  if (existing) errors.push('Membership number already exists.');
+  if (existing) {
+    req.flash('warning', `Membership number ${data.membership_no} already exists — showing existing record.`);
+    return res.redirect(`/members/${existing.id}`);
+  }
 
   if (errors.length) {
     if (req.file) deleteFile(req.file.path);
@@ -130,7 +133,7 @@ exports.create = async (req, res) => {
   req.flash('success', `Member "${data.full_name}" created successfully.`);
   if (req.body._action === 'create_close') return res.redirect('/members');
   const created = await db.prepare('SELECT id FROM members WHERE membership_no = ?').get(data.membership_no);
-  res.redirect(`/members/${created.id}`);
+  res.redirect(created ? `/members/${created.id}` : '/members');
 };
 
 exports.show = async (req, res) => {
