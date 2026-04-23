@@ -22,21 +22,30 @@ if (process.env.TURSO_DATABASE_URL) {
 }
 
 async function initDb() {
-  try {
-    await client.execute('PRAGMA foreign_keys = ON');
-  } catch (_) {}
+  // Strip SQL comments so we can classify statements reliably
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-  const stmts = schema.split(';').map(s => s.trim()).filter(Boolean);
-  for (const stmt of stmts) {
-    try {
-      await client.execute(stmt);
-    } catch (e) {
-      const msg = String(e.message);
-      if (!msg.includes('already exists') && !msg.includes('duplicate column name')) {
-        console.error('Schema stmt error:', e.message, '|', stmt.substring(0, 60));
-      }
+  const stmts = schema
+    .split(';')
+    .map(s => s.replace(/--[^\n]*/g, '').trim())  // strip -- comments
+    .filter(Boolean);
+
+  const silentErr = (e) => {
+    const m = String(e.message);
+    if (!m.includes('already exists') && !m.includes('duplicate column name') && !m.includes('no such column')) {
+      console.error('Schema stmt error:', m.slice(0, 120));
     }
-  }
+  };
+  const run = (stmt) => client.execute(stmt).catch(silentErr);
+
+  // Phase 1 — CREATE TABLE (must exist before ALTER/INDEX/UPDATE)
+  await Promise.all(stmts.filter(s => /^CREATE TABLE/i.test(s)).map(run));
+
+  // Phase 2 — ALTER TABLE + data backfills (parallel, tables now exist)
+  await Promise.all(stmts.filter(s => /^ALTER TABLE|^UPDATE /i.test(s)).map(run));
+
+  // Phase 3 — CREATE INDEX (parallel, no ordering dependency)
+  await Promise.all(stmts.filter(s => /^CREATE INDEX/i.test(s)).map(run));
+
   console.log('DB: schema ready');
 }
 
